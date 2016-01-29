@@ -1,7 +1,6 @@
 # Introduction
 The Monasca Tempest Tests use the [OpenStack Tempest Plugin Interface](http://docs.openstack.org/developer/tempest/plugin.html). This README describes how to configure and run them using a variety of methods.
-Currently the monasca-vagrant environment is needed to run the tests. Instructions on setting up a monasca-vagrant environment can be found here: https://github.com/openstack/monasca-vagrant. This document will be updated when 
-the environment is switched to the DevStack environment.
+Currently the monasca-vagrant environment is needed to run the tests. Instructions on setting up a monasca-vagrant environment can be found here: https://github.com/openstack/monasca-vagrant. This document will be updated when the environment is switched to the DevStack environment.
 
 # Configuring to run the Monasca Tempest Tests
 1. Clone the OpenStack Tempest repo, and cd to it.
@@ -15,7 +14,7 @@ the environment is switched to the DevStack environment.
     ```
     virtualenv .venv
     source .venv/bin/activate
-    ``` 
+    ```
 3. Install the Tempest requirements in the virtualenv.
 
     ```
@@ -68,7 +67,7 @@ the environment is switched to the DevStack environment.
    cd into the monasa-api root directory. Making sure that the tempest virtual env is still active,
    run the following command.
 
-    ```    
+    ```
     python setup.py install
     ```
 
@@ -78,20 +77,27 @@ See the [OpenStack Tempest Plugin Interface](http://docs.openstack.org/developer
 The Monasca Tempest Tests can be run using a variety of methods including:
 1. [Testr](https://wiki.openstack.org/wiki/Testr)
 2. [Os-testr](http://docs.openstack.org/developer/os-testr/)
-3. [PyCharm]([Os-testr](https://www.jetbrains.com/pycharm/)
+3. [PyCharm](https://www.jetbrains.com/pycharm/)
+4. Tempest Scripts in Devstack
 
 ## Run the tests from the CLI using testr
 
 [Testr](https://wiki.openstack.org/wiki/Testr) is a test runner that can be used to run the Tempest tests.
 
-1. In the Tempest root dir, create a list of the Monasca Tempest Tests in a file.
+1. Initializing testr is necessary to set up the .testrepository directory before using it for the first time. In the Tempest root dir:
 
+    ```
+    testr init
+    ```
+
+2. Create a list of the Monasca Tempest Tests in a file:
+    
     ```
     testr list-tests monasca_tempest_tests > monasca_tempest_tests
 
     ```
 
-2. Run the tests using testr
+3. Run the tests using testr:
 
     ```
     testr run --load-list=monasca_tempest_tests
@@ -104,11 +110,14 @@ You can also use testr to create a list of specific tests for your needs.
 1. In the Tempest root dir:
 
     ```
-    ostestr --regex monasca_tempest_tests
-    ````
+    ostestr --serial --regex monasca_tempest_tests
+    ```
+    ```--serial``` option is necessary here. Monasca tempest tests can't be run in parallel (default option in ostestr) because some tests depend on the same data and will randomly fail.
 
 ## Running/Debugging the Monasca Tempest Tests in PyCharm
+
 Assuming that you have already created a PyCharm project for the ```monasca-api``` do the following:
+
 1. In PyCharm, Edit Configurations and add a new Python tests configuration by selecting Python tests->Nosetests.
 2. Name the test. For example TestVersions.
 3. Set the path to the script with the tests to run. For example, ~/repos/monasca-api/monasca_tempest_tests/api/test_versions.py
@@ -117,6 +126,14 @@ Assuming that you have already created a PyCharm project for the ```monasca-api`
 6. Select the Python interpreter for your project to be the same as the one virtualenv created above. For example, ~/repos/tempest/.venv
 7. Run the tests. You should also be able to debug them.
 8. Step and repeat for other tests.
+
+## Run the tests from the CLI using tempest scripts in devstack
+
+1. In /opt/stack/tempest, run ```./run_tempest.sh monasca_tempest_tests```
+2. If asked to create a new virtual environment, select yes
+3. Activate the virtual environment ```source .venv/bin/activate```
+4. In your monasca-api directory, run ```python setup.py install```
+5. In /opt/stack/tempest, run ```./run_tempest.sh monasca_tempest_tests```
 
 # References
 This section provides a few additional references that might be useful:

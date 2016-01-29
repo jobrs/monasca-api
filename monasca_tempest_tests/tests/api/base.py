@@ -12,6 +12,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 from tempest import config
+from tempest.common import credentials_factory
 import tempest.test
 from tempest_lib import exceptions
 
@@ -30,7 +31,14 @@ class BaseMonascaTest(tempest.test.BaseTestCase):
     @classmethod
     def resource_setup(cls):
         super(BaseMonascaTest, cls).resource_setup()
-        cls.os = clients.Manager()
+        auth_version = CONF.identity.auth_version
+        cls.cred_provider = credentials_factory.get_credentials_provider(
+            cls.__name__,
+            force_tenant_isolation=True,
+            identity_version=auth_version)
+        credentials = cls.cred_provider.get_creds_by_roles(
+            ['monasca-user', 'anotherrole'])
+        cls.os = clients.Manager(credentials=credentials)
         cls.monasca_client = cls.os.monasca_client
 
     @staticmethod
@@ -45,8 +53,26 @@ class BaseMonascaTest(tempest.test.BaseTestCase):
     def resource_cleanup(cls):
         super(BaseMonascaTest, cls).resource_cleanup()
         resp, response_body = cls.monasca_client.list_alarm_definitions()
-        elements = response_body['elements']
-        for definition in elements:
-            id = definition['id']
-            resp, response_body = cls.monasca_client. \
-                delete_alarm_definition(id)
+        if resp.status == 200:
+            if 'elements' in response_body:
+                elements = response_body['elements']
+                for element in elements:
+                    id = element['id']
+                    cls.monasca_client.delete_alarm_definition(id)
+
+        resp, response_body = cls.monasca_client.list_notification_methods()
+        if resp.status == 200:
+            if 'elements' in response_body:
+                elements = response_body['elements']
+                for element in elements:
+                    id = element['id']
+                    cls.monasca_client.delete_notification_method(id)
+
+        resp, response_body = cls.monasca_client.list_alarms()
+        if resp.status == 200:
+            if 'elements' in response_body:
+                elements = response_body['elements']
+                for element in elements:
+                    id = element['id']
+                    cls.monasca_client.delete_alarm(id)
+        cls.cred_provider.clear_creds()

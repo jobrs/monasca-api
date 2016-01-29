@@ -52,9 +52,9 @@ public class StatisticVerticaRepoImpl implements StatisticRepo {
       "select defdims.id, def.name, d.name as dname, d.value as dvalue "
       + "from MonMetrics.Definitions def, MonMetrics.DefinitionDimensions defdims "
       + "left outer join MonMetrics.Dimensions d on d.dimension_set_id = defdims.dimension_set_id "
-      + "%s "
       + "where def.id = defdims.definition_id and def.tenant_id = :tenantId "
-      + "%s "
+      + "%s " // metric name here
+      + "%s " // dimension and clause here
       + "order by defdims.id ASC";
 
   private static final String TABLE_TO_JOIN_DIMENSIONS_ON = "defdims";
@@ -106,7 +106,7 @@ public class StatisticVerticaRepoImpl implements StatisticRepo {
 
       String sql = createQuery(byteMap.keySet(), period, startTime, endTime, offset, statisticsCols);
 
-      logger.debug("vertics sql: {}", sql);
+      logger.debug("vertica sql: {}", sql);
 
       Query<Map<String, Object>>
           query =
@@ -208,8 +208,8 @@ public class StatisticVerticaRepoImpl implements StatisticRepo {
     String sql =
         String
             .format(FIND_BY_METRIC_DEF_SQL,
-                    MetricQueries.buildJoinClauseFor(dimensions, TABLE_TO_JOIN_DIMENSIONS_ON),
-                    sb);
+                    sb,
+                    MetricQueries.buildDimensionAndClause(dimensions, TABLE_TO_JOIN_DIMENSIONS_ON));
 
     Query<Map<String, Object>> query =
         h.createQuery(sql)
@@ -302,7 +302,7 @@ public class StatisticVerticaRepoImpl implements StatisticRepo {
     }
 
     sb.append(" FROM MonMetrics.Measurements ");
-    String inClause = createInClause(defDimIdSet);
+    String inClause = MetricQueries.createDefDimIdInClause(defDimIdSet);
     sb.append("WHERE to_hex(definition_dimensions_id) " + inClause);
     sb.append(createWhereClause(startTime, endTime, offset));
 
@@ -312,29 +312,6 @@ public class StatisticVerticaRepoImpl implements StatisticRepo {
     }
 
     sb.append(" limit :limit");
-
-    return sb.toString();
-  }
-
-  private String createInClause(Set<byte[]> defDimIdSet) {
-
-    StringBuilder sb = new StringBuilder("IN ");
-
-    sb.append("(");
-
-    boolean first = true;
-    for (byte[] defDimId : defDimIdSet) {
-
-      if (first) {
-        first = false;
-      } else {
-        sb.append(",");
-      }
-
-      sb.append("'" + Hex.encodeHexString(defDimId) + "'");
-    }
-
-    sb.append(") ");
 
     return sb.toString();
   }

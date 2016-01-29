@@ -1,5 +1,7 @@
-# -*- coding: utf8 -*-
+# -*- coding: utf-8 -*-
 # Copyright 2014 Hewlett-Packard
+# (C) Copyright 2015,2016 Hewlett Packard Enterprise Development Company LP
+# Copyright 2015 Cray Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -12,13 +14,14 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-
+from datetime import datetime
 import json
 
 from influxdb import client
 from influxdb.exceptions import InfluxDBClientError
 from oslo_config import cfg
 from oslo_log import log
+from oslo_utils import timeutils
 
 from monasca_api.common.repositories import exceptions
 from monasca_api.common.repositories import metrics_repository
@@ -53,10 +56,12 @@ class MetricsRepository(metrics_repository.MetricsRepository):
             LOG.exception(ex)
             raise exceptions.RepositoryException(ex)
 
-    def _build_show_series_query(self, dimensions, name, tenant_id, region):
+    def _build_show_series_query(self, dimensions, name, tenant_id, region,
+                                 start_timestamp=None, end_timestamp=None):
 
         where_clause = self._build_where_clause(dimensions, name, tenant_id,
-                                                region)
+                                                region, start_timestamp,
+                                                end_timestamp)
 
         query = 'show series ' + where_clause
 
@@ -113,7 +118,9 @@ class MetricsRepository(metrics_repository.MetricsRepository):
 
         # name - optional
         if name:
-            where_clause += ' from  "{}" '.format(name.encode('utf8'))
+            # replace ' with \' to make query parsable
+            clean_name = name.replace("'", "\\'")
+            where_clause += ' from  "{}" '.format(clean_name.encode('utf8'))
 
         # tenant id
         where_clause += " where _tenant_id = '{}' ".format(tenant_id.encode(
@@ -126,15 +133,33 @@ class MetricsRepository(metrics_repository.MetricsRepository):
         if dimensions:
             for dimension_name, dimension_value in iter(
                     sorted(dimensions.iteritems())):
-                where_clause += " and {} = '{}'".format(
-                    dimension_name.encode('utf8'), dimension_value.encode(
-                        'utf8'))
+                # replace ' with \' to make query parsable
+                clean_dimension_name = dimension_name.replace("\'", "\\'")
+                if dimension_value == "":
+                    where_clause += " and \"{}\" =~ /.*/ ".format(
+                        clean_dimension_name)
+                elif '|' in dimension_value:
+                    # replace ' with \' to make query parsable
+                    clean_dimension_value = dimension_value.replace("\'", "\\'")
 
-        if start_timestamp:
-            where_clause += " and time > " + str(int(start_timestamp)) + "s"
+                    where_clause += " and \"{}\" =~ /^{}$/ ".format(
+                        clean_dimension_name.encode('utf8'),
+                        clean_dimension_value.encode('utf8'))
+                else:
+                    # replace ' with \' to make query parsable
+                    clean_dimension_value = dimension_value.replace("\'", "\\'")
 
-            if end_timestamp:
-                where_clause += " and time < " + str(int(end_timestamp)) + "s"
+                    where_clause += " and \"{}\" = '{}' ".format(
+                        clean_dimension_name.encode('utf8'),
+                        clean_dimension_value.encode('utf8'))
+
+        if start_timestamp is not None:
+            where_clause += " and time > " + str(int(start_timestamp *
+                                                     1000000)) + "u"
+
+            if end_timestamp is not None:
+                where_clause += " and time < " + str(int(end_timestamp *
+                                                         1000000)) + "u"
 
         return where_clause
 
@@ -147,12 +172,11 @@ class MetricsRepository(metrics_repository.MetricsRepository):
         return from_clause
 
     def list_metrics(self, tenant_id, region, name, dimensions, offset,
-                     limit):
+                     limit, start_timestamp=None, end_timestamp=None):
 
         try:
 
-            query = self._build_show_series_query(dimensions, name, tenant_id,
-                                                  region)
+            query = self._build_show_series_query(dimensions, name, tenant_id, region)
 
             query += " limit {}".format(limit + 1)
 
@@ -161,15 +185,29 @@ class MetricsRepository(metrics_repository.MetricsRepository):
 
             result = self.influxdb_client.query(query)
 
-            json_metric_list = self._build_serie_metric_list(result)
+            json_metric_list = self._build_serie_metric_list(result,
+                                                             tenant_id,
+                                                             region,
+                                                             start_timestamp,
+                                                             end_timestamp,
+                                                             offset)
 
             return json_metric_list
+
+        except InfluxDBClientError as ex:
+            if ex.message.startswith(MEASUREMENT_NOT_FOUND_MSG):
+                return []
+            else:
+                LOG.exception(ex)
+                raise exceptions.RepositoryException(ex)
 
         except Exception as ex:
             LOG.exception(ex)
             raise exceptions.RepositoryException(ex)
 
-    def _build_serie_metric_list(self, series_names):
+    def _build_serie_metric_list(self, series_names, tenant_id, region,
+                                 start_timestamp, end_timestamp,
+                                 offset):
 
         json_metric_list = []
 
@@ -178,7 +216,9 @@ class MetricsRepository(metrics_repository.MetricsRepository):
 
         if 'series' in series_names.raw:
 
-            id = 0
+            metric_id = 0
+            if offset:
+                metric_id = int(offset) + 1
 
             for series in series_names.raw['series']:
 
@@ -190,12 +230,19 @@ class MetricsRepository(metrics_repository.MetricsRepository):
                         if value and not name.startswith(u'_')
                     }
 
-                    metric = {u'id': str(id),
-                              u'name': series[u'name'],
-                              u'dimensions': dimensions}
-                    id += 1
+                    if self._has_measurements(tenant_id,
+                                              region,
+                                              series[u'name'],
+                                              dimensions,
+                                              start_timestamp,
+                                              end_timestamp):
 
-                    json_metric_list.append(metric)
+                        metric = {u'id': str(metric_id),
+                                  u'name': series[u'name'],
+                                  u'dimensions': dimensions}
+                        metric_id += 1
+
+                        json_metric_list.append(metric)
 
         return json_metric_list
 
@@ -220,6 +267,18 @@ class MetricsRepository(metrics_repository.MetricsRepository):
 
         return json_metric_list
 
+    def _get_dimensions(self, tenant_id, region, name, dimensions):
+        metrics_list = self.list_metrics(tenant_id, region, name,
+                                         dimensions, None, 2)
+
+        if len(metrics_list) > 1:
+            raise exceptions.MultipleMetricsException(self.MULTIPLE_METRICS_MESSAGE)
+
+        if not metrics_list:
+            return {}
+
+        return metrics_list[0]['dimensions']
+
     def measurement_list(self, tenant_id, region, name, dimensions,
                          start_timestamp, end_timestamp, offset,
                          limit, merge_metrics_flag):
@@ -227,16 +286,6 @@ class MetricsRepository(metrics_repository.MetricsRepository):
         json_measurement_list = []
 
         try:
-
-            if not merge_metrics_flag:
-
-                metrics_list = self.list_metrics(tenant_id, region, name,
-                                                 dimensions, None, 2)
-
-                if len(metrics_list) > 1:
-                    raise (exceptions.RepositoryException(
-                        MetricsRepository.MULTIPLE_METRICS_MESSAGE))
-
             query = self._build_select_measurement_query(dimensions, name,
                                                          tenant_id,
                                                          region,
@@ -245,6 +294,7 @@ class MetricsRepository(metrics_repository.MetricsRepository):
                                                          offset, limit)
 
             if not merge_metrics_flag:
+                dimensions = self._get_dimensions(tenant_id, region, name, dimensions)
                 query += " slimit 1"
 
             result = self.influxdb_client.query(query)
@@ -259,7 +309,9 @@ class MetricsRepository(metrics_repository.MetricsRepository):
                     measurements_list = []
                     for point in serie['values']:
                         value_meta = json.loads(point[2]) if point[2] else {}
-                        measurements_list.append([point[0],
+                        timestamp = point[0][:19] + '.' + point[0][20:-1].ljust(3, '0') + 'Z'
+
+                        measurements_list.append([timestamp,
                                                   point[1],
                                                   value_meta])
 
@@ -285,7 +337,7 @@ class MetricsRepository(metrics_repository.MetricsRepository):
 
                 LOG.exception(ex)
 
-                raise exceptions.RepositoryException(ex)
+                raise ex
 
         except InfluxDBClientError as ex:
 
@@ -335,15 +387,6 @@ class MetricsRepository(metrics_repository.MetricsRepository):
         json_statistics_list = []
 
         try:
-
-            if not merge_metrics_flag:
-                metrics_list = self.list_metrics(tenant_id, region, name,
-                                                 dimensions, None, 2)
-
-                if len(metrics_list) > 1:
-                    raise (exceptions.RepositoryException(
-                        MetricsRepository.MULTIPLE_METRICS_MESSAGE))
-
             query = self._build_statistics_query(dimensions, name, tenant_id,
                                                  region,
                                                  start_timestamp,
@@ -351,6 +394,7 @@ class MetricsRepository(metrics_repository.MetricsRepository):
                                                  period, offset, limit)
 
             if not merge_metrics_flag:
+                dimensions = self._get_dimensions(tenant_id, region, name, dimensions)
                 query += " slimit 1"
 
             result = self.influxdb_client.query(query)
@@ -361,8 +405,8 @@ class MetricsRepository(metrics_repository.MetricsRepository):
             for serie in result.raw['series']:
 
                 if 'values' in serie:
-                    columns = ([column.replace('mean', 'avg') for column in
-                                serie['columns']])
+                    columns = [column.replace('time', 'timestamp').replace('mean', 'avg')
+                               for column in serie['columns']]
 
                     stats_list = []
                     for stats in serie['values']:
@@ -390,7 +434,7 @@ class MetricsRepository(metrics_repository.MetricsRepository):
 
                 LOG.exception(ex)
 
-                raise exceptions.RepositoryException(ex)
+                raise ex
 
         except InfluxDBClientError as ex:
 
@@ -421,6 +465,37 @@ class MetricsRepository(metrics_repository.MetricsRepository):
             offset_clause = " limit {}".format(str(limit + 1))
 
         return offset_clause
+
+    def _has_measurements(self, tenant_id, region, name, dimensions,
+                          start_timestamp, end_timestamp):
+
+        has_measurements = True
+
+        #
+        # No need for the additional query if we don't have a start timestamp.
+        #
+        if not start_timestamp:
+            return True
+
+        #
+        # We set limit to 1 for the measurement_list call, as we are only
+        # interested in knowing if there is at least one measurement, and
+        # not ask too much of influxdb.
+        #
+        measurements = self.measurement_list(tenant_id,
+                                             region,
+                                             name,
+                                             dimensions,
+                                             start_timestamp,
+                                             end_timestamp,
+                                             0,
+                                             1,
+                                             False)
+
+        if len(measurements) == 0:
+            has_measurements = False
+
+        return has_measurements
 
     def alarm_history(self, tenant_id, alarm_id_list,
                       offset, limit, start_timestamp=None,
@@ -458,11 +533,12 @@ class MetricsRepository(metrics_repository.MetricsRepository):
 
             time_clause = ''
             if start_timestamp:
-                time_clause += (" and time > " + str(int(start_timestamp)) +
-                                "s ")
+                time_clause += " and time > " + str(int(start_timestamp *
+                                                        1000000)) + "u "
 
             if end_timestamp:
-                time_clause += " and time < " + str(int(end_timestamp)) + "s "
+                time_clause += " and time < " + str(int(end_timestamp *
+                                                        1000000)) + "u "
 
             offset_clause = self._build_offset_clause(offset, limit)
 
@@ -484,7 +560,8 @@ class MetricsRepository(metrics_repository.MetricsRepository):
                                    u'reason': point[5],
                                    u'reason_data': point[6],
                                    u'sub_alarms': json.loads(point[7]),
-                                   u'tenant_id': point[8]}
+                                   u'id': str(self._get_millis_from_timestamp(
+                                       timeutils.parse_isotime(point[0])))}
 
                     # java api formats these during json serialization
                     if alarm_point[u'sub_alarms']:
@@ -504,3 +581,7 @@ class MetricsRepository(metrics_repository.MetricsRepository):
             LOG.exception(ex)
 
             raise exceptions.RepositoryException(ex)
+
+    def _get_millis_from_timestamp(self, dt):
+        dt = dt.replace(tzinfo=None)
+        return int((dt - datetime(1970, 1, 1)).total_seconds() * 1000)

@@ -1,4 +1,4 @@
-# Copyright 2015 Cray
+# Copyright 2015 Cray Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -35,10 +35,10 @@ class TestRepoMetricsInfluxDB(unittest.TestCase):
                 {
                     "name": "dummy.series",
                     "values": [
-                        [1, 2, None],
-                        [2, 2.5, ''],
-                        [3, 4.0, '{}'],
-                        [4, 4, '{"key": "value"}']
+                        ["2015-03-14T09:26:53.59Z", 2, None],
+                        ["2015-03-14T09:26:53.591Z", 2.5, ''],
+                        ["2015-03-14T09:26:53.6Z", 4.0, '{}'],
+                        ["2015-03-14T09:26:54Z", 4, '{"key": "value"}']
                     ]
                 }
             ]
@@ -65,7 +65,10 @@ class TestRepoMetricsInfluxDB(unittest.TestCase):
         measurements = result[0]['measurements']
 
         self.assertEqual(
-            [[1, 2, {}], [2, 2.5, {}], [3, 4.0, {}], [4, 4, {"key": "value"}]],
+            [["2015-03-14T09:26:53.590Z", 2, {}],
+             ["2015-03-14T09:26:53.591Z", 2.5, {}],
+             ["2015-03-14T09:26:53.600Z", 4.0, {}],
+             ["2015-03-14T09:26:54.000Z", 4, {"key": "value"}]],
             measurements
         )
 

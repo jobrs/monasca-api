@@ -31,11 +31,11 @@ class TestVersions(testing.TestBase):
         result = self.simulate_request('/versions')
         self.assertEqual(self.srmock.status, falcon.HTTP_200)
         response = json.loads(result[0])
-        self.assertTrue(isinstance(response, dict))
+        self.assertIsInstance(response, dict)
         self.assertTrue(set(['links', 'elements']) ==
                         set(response))
         links = response['links']
-        self.assertTrue(isinstance(links, list))
+        self.assertIsInstance(links, list)
         link = links[0]
         self.assertTrue(set(['rel', 'href']) ==
                         set(link))
@@ -46,17 +46,17 @@ class TestVersions(testing.TestBase):
         result = self.simulate_request('/versions/v2.0')
         self.assertEqual(self.srmock.status, falcon.HTTP_200)
         response = json.loads(result[0])
-        self.assertTrue(isinstance(response, dict))
+        self.assertIsInstance(response, dict)
         version = response
         self.assertTrue(set(['id', 'links', 'status', 'updated']) ==
                         set(version))
         self.assertEqual(version['id'], u'v2.0')
         self.assertEqual(version['status'], u'CURRENT')
         date_object = datetime.datetime.strptime(version['updated'],
-                                                 "%Y-%m-%dT%H:%M:%SZ")
-        self.assertTrue(isinstance(date_object, datetime.datetime))
+                                                 "%Y-%m-%dT%H:%M:%S.%fZ")
+        self.assertIsInstance(date_object, datetime.datetime)
         links = response['links']
-        self.assertTrue(isinstance(links, list))
+        self.assertIsInstance(links, list)
         link = links[0]
         self.assertTrue(set(['rel', 'href']) ==
                         set(link))
@@ -65,4 +65,4 @@ class TestVersions(testing.TestBase):
 
     def test_invalid_version_id(self):
         self.simulate_request('/versions/v1.0')
-        self.assertEqual(self.srmock.status, falcon.HTTP_400)
+        self.assertEqual(self.srmock.status, '422 Unprocessable Entity')

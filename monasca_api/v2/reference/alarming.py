@@ -1,4 +1,4 @@
-# Copyright 2014 Hewlett-Packard
+# Copyright 2014,2016 Hewlett Packard Enterprise Development Company, L.P.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -44,8 +44,12 @@ class Alarming(object):
     def _send_alarm_transitioned_event(self, tenant_id, alarm_id,
                                        alarm_definition_row,
                                        alarm_metric_rows,
-                                       old_state, new_state):
+                                       old_state, new_state,
+                                       link, lifecycle_state,
+                                       time_ms):
 
+        # This is a change via the API, so there is no SubAlarm info to add
+        sub_alarms = []
         metrics = []
         alarm_transitioned_event_msg = {u'alarm-transitioned': {
             u'tenantId': tenant_id,
@@ -56,8 +60,12 @@ class Alarming(object):
             u'actionsEnabled': alarm_definition_row['actions_enabled'] == 1,
             u'stateChangeReason': 'Alarm state updated via API',
             u'severity': alarm_definition_row['severity'],
+            u'link': link,
+            u'lifecycleState': lifecycle_state,
             u'oldState': old_state,
             u'newState': new_state,
+            u'timestamp': time_ms,
+            u'subAlarms': sub_alarms,
             u'metrics': metrics}
         }
 
@@ -75,14 +83,16 @@ class Alarming(object):
         metric = {u'name': alarm_metric_row['name'],
                   u'dimensions': dimensions}
 
-        for dimension in alarm_metric_row['dimensions'].split(','):
-            parsed_dimension = dimension.split('=')
-            dimensions[parsed_dimension[0]] = parsed_dimension[1]
+        if alarm_metric_row['dimensions']:
+            for dimension in alarm_metric_row['dimensions'].split(','):
+                parsed_dimension = dimension.split('=')
+                dimensions[parsed_dimension[0]] = parsed_dimension[1]
 
         return metric
 
     def _send_alarm_event(self, event_type, tenant_id, alarm_definition_id,
-                          alarm_metric_rows, sub_alarm_rows, extra_info=None):
+                          alarm_metric_rows, sub_alarm_rows, link, lifecycle_state,
+                          extra_info=None):
 
         if not alarm_metric_rows:
             return
@@ -104,17 +114,18 @@ class Alarming(object):
                     sub_alarms_event_msg = (
                         self._build_sub_alarm_event_msg(sub_alarm_dict,
                                                         prev_alarm_id))
-                    alarm_event_msg[event_type][
-                        u'subAlarms': sub_alarms_event_msg]
+                    alarm_event_msg[event_type][u'subAlarms'] = sub_alarms_event_msg
                     self.send_event(self.events_message_queue,
                                     alarm_event_msg)
 
                 alarm_metrics_event_msg = []
-                alarm_event_msg = {event_type: {u'tenant_id': tenant_id,
+                alarm_event_msg = {event_type: {u'tenantId': tenant_id,
                                                 u'alarmDefinitionId':
                                                     alarm_definition_id,
                                                 u'alarmId': alarm_metric_row[
                                                     'alarm_id'],
+                                                u'link': link,
+                                                u'lifecycleState': lifecycle_state,
                                                 u'alarmMetrics':
                                                     alarm_metrics_event_msg}}
                 if extra_info:

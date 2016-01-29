@@ -11,10 +11,13 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-
+import datetime
 import time
 
 from tempest.common.utils import data_utils
+
+NUM_ALARM_DEFINITIONS = 2
+NUM_MEASUREMENTS = 100
 
 
 def create_metric(name='name-1',
@@ -22,8 +25,13 @@ def create_metric(name='name-1',
                       'key-1': 'value-1',
                       'key-2': 'value-2'
                   },
-                  timestamp=time.time() * 1000,
-                  value=0.0):
+                  timestamp=None,
+                  value=0.0,
+                  value_meta={
+                      'key-1': 'value-1',
+                      'key-2': 'value-2'
+                  },
+                  ):
     metric = {}
     if name is not None:
         metric['name'] = name
@@ -31,8 +39,12 @@ def create_metric(name='name-1',
         metric['dimensions'] = dimensions
     if timestamp is not None:
         metric['timestamp'] = timestamp
+    else:
+        metric['timestamp'] = int(time.time() * 1000)
     if value is not None:
         metric['value'] = value
+    if value_meta is not None:
+        metric['value_meta'] = value_meta
     return metric
 
 
@@ -75,3 +87,28 @@ def create_alarm_definition(name=None,
     if undetermined_actions is not None:
         alarm_definition['undetermined_actions'] = undetermined_actions
     return alarm_definition
+
+
+def delete_alarm_definitions(monasca_client):
+    # Delete alarm definitions
+    resp, response_body = monasca_client.list_alarm_definitions()
+    elements = response_body['elements']
+    if elements:
+        for element in elements:
+            alarm_def_id = element['id']
+            monasca_client.delete_alarm_definition(alarm_def_id)
+
+
+def timestamp_to_iso(timestamp):
+    time_utc = datetime.datetime.utcfromtimestamp(timestamp / 1000.0)
+    time_iso_base = time_utc.strftime("%Y-%m-%dT%H:%M:%S")
+    time_iso_base += 'Z'
+    return time_iso_base
+
+
+def timestamp_to_iso_millis(timestamp):
+    time_utc = datetime.datetime.utcfromtimestamp(timestamp / 1000.0)
+    time_iso_base = time_utc.strftime("%Y-%m-%dT%H:%M:%S")
+    time_iso_microsecond = time_utc.strftime(".%f")
+    time_iso_millisecond = time_iso_base + time_iso_microsecond[0:4] + 'Z'
+    return time_iso_millisecond

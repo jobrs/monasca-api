@@ -1,5 +1,6 @@
 # Copyright 2014 Hewlett-Packard
-# Copyright 2015 Cray Ltd.
+# Copyright 2015 Cray Inc. All Rights Reserved.
+# Copyright 2016 Hewlett Packard Enterprise Development Company LP
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -15,14 +16,15 @@
 
 import datetime
 import json
-import urllib
-import urlparse
+import six.moves.urllib.parse as urlparse
 
 import falcon
 from oslo_log import log
+from oslo_utils import timeutils
 import simplejson
 
 from monasca_api.common.repositories import constants
+from monasca_api.v2.common.exceptions import HTTPUnprocessableEntityError
 from monasca_api.v2.common.schemas import dimensions_schema
 from monasca_api.v2.common.schemas import exceptions as schemas_exceptions
 from monasca_api.v2.common.schemas import metric_name_schema
@@ -121,7 +123,11 @@ def get_query_param(req, param_name, required=False, default_val=None):
     try:
         params = falcon.uri.parse_query_string(req.query_string)
         if param_name in params:
-            param_val = params[param_name].decode('utf8')
+            if isinstance(params[param_name], list):
+                param_val = params[param_name][0].decode('utf8')
+            else:
+                param_val = params[param_name].decode('utf8')
+
             return param_val
         else:
             if required:
@@ -130,7 +136,7 @@ def get_query_param(req, param_name, required=False, default_val=None):
                 return default_val
     except Exception as ex:
         LOG.debug(ex)
-        raise falcon.HTTPBadRequest('Bad request', ex.message)
+        raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
 
 
 def get_query_name(req, name_required=False):
@@ -150,7 +156,7 @@ def get_query_name(req, name_required=False):
                 return ''
     except Exception as ex:
         LOG.debug(ex)
-        raise falcon.HTTPBadRequest('Bad request', ex.message)
+        raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
 
 
 def get_query_dimensions(req):
@@ -178,12 +184,14 @@ def get_query_dimensions(req):
                 if len(dimension_name_value) == 2:
                     dimensions[dimension_name_value[0]] = dimension_name_value[
                         1]
+                elif len(dimension_name_value) == 1:
+                    dimensions[dimension_name_value[0]] = ""
                 else:
                     raise Exception('Dimensions are malformed')
         return dimensions
     except Exception as ex:
         LOG.debug(ex)
-        raise falcon.HTTPBadRequest('Bad request', ex.message)
+        raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
 
 
 def get_query_starttime_timestamp(req, required=True):
@@ -198,7 +206,7 @@ def get_query_starttime_timestamp(req, required=True):
                 return None
     except Exception as ex:
         LOG.debug(ex)
-        raise falcon.HTTPBadRequest('Bad request', ex.message)
+        raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
 
 
 def get_query_endtime_timestamp(req, required=True):
@@ -213,11 +221,19 @@ def get_query_endtime_timestamp(req, required=True):
                 return None
     except Exception as ex:
         LOG.debug(ex)
-        raise falcon.HTTPBadRequest('Bad request', ex.message)
+        raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
+
+
+def validate_start_end_timestamps(start_timestamp, end_timestamp=None):
+    if end_timestamp:
+        if not start_timestamp < end_timestamp:
+            raise falcon.HTTPBadRequest('Bad request',
+                                        'start_time must be before end_time')
 
 
 def _convert_time_string(date_time_string):
-    dt = datetime.datetime.strptime(date_time_string, "%Y-%m-%dT%H:%M:%SZ")
+    dt = timeutils.parse_isotime(date_time_string)
+    dt = timeutils.normalize_time(dt)
     timestamp = (dt - datetime.datetime(1970, 1, 1)).total_seconds()
     return timestamp
 
@@ -241,19 +257,26 @@ def get_query_statistics(req):
             raise Exception("Missing statistics")
     except Exception as ex:
         LOG.debug(ex)
-        raise falcon.HTTPBadRequest('Bad request', ex.message)
+        raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
 
 
 def get_query_period(req):
     try:
         params = falcon.uri.parse_query_string(req.query_string)
         if 'period' in params:
-            return params['period']
+            period = params['period']
+            try:
+                period = int(period)
+            except Exception:
+                raise Exception("Period must be a valid integer")
+            if period < 0:
+                raise Exception("Period must be a positive integer")
+            return str(period)
         else:
             return None
     except Exception as ex:
         LOG.debug(ex)
-        raise falcon.HTTPBadRequest('Bad request', ex.message)
+        raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
 
 
 def validate_query_name(name):
@@ -266,7 +289,7 @@ def validate_query_name(name):
         metric_name_schema.validate(name)
     except schemas_exceptions.ValidationException as ex:
         LOG.debug(ex)
-        raise falcon.HTTPBadRequest('Bad request', ex.message)
+        raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
 
 
 def validate_query_dimensions(dimensions):
@@ -279,7 +302,7 @@ def validate_query_dimensions(dimensions):
         dimensions_schema.validate(dimensions)
     except schemas_exceptions.ValidationException as ex:
         LOG.debug(ex)
-        raise falcon.HTTPBadRequest('Bad request', ex.message)
+        raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
 
 
 def paginate(resource, uri, limit):
@@ -302,7 +325,7 @@ def paginate(resource, uri, limit):
 
         next_link = build_base_uri(parsed_uri)
 
-        new_query_params = [u'offset' + '=' + urllib.quote(
+        new_query_params = [u'offset' + '=' + urlparse.quote(
             new_offset.encode('utf8'), safe='')]
 
         _get_old_query_params_except_offset(new_query_params, parsed_uri)
@@ -344,7 +367,7 @@ def paginate_measurement(measurement, uri, limit):
 
         next_link = build_base_uri(parsed_uri)
 
-        new_query_params = [u'offset' + '=' + urllib.quote(
+        new_query_params = [u'offset' + '=' + urlparse.quote(
             new_offset.encode('utf8'), safe='')]
 
         _get_old_query_params_except_offset(new_query_params, parsed_uri)
@@ -352,12 +375,12 @@ def paginate_measurement(measurement, uri, limit):
         if new_query_params:
             next_link += '?' + '&'.join(new_query_params)
 
-        truncated_measurement = {u'dimensions': measurement[0]['dimensions'],
-                                 u'measurements': (measurement[0]
-                                                   ['measurements'][:limit]),
-                                 u'name': measurement[0]['name'],
-                                 u'columns': measurement[0]['columns'],
-                                 u'id': new_offset}
+        truncated_measurement = [{u'dimensions': measurement[0]['dimensions'],
+                                  u'measurements': (measurement[0]
+                                                    ['measurements'][:limit]),
+                                  u'name': measurement[0]['name'],
+                                  u'columns': measurement[0]['columns'],
+                                  u'id': new_offset}]
 
         resource = {u'links': ([{u'rel': u'self',
                                  u'href': self_link.decode('utf8')},
@@ -380,12 +403,12 @@ def _get_old_query_params(parsed_uri):
     if parsed_uri.query:
 
         for query_param in parsed_uri.query.split('&'):
-            query_param_name, query_param_val = query_param.split('=')
+            query_param_name, query_param_val = query_param.split('=', 1)
 
-            old_query_params.append(urllib.quote(
+            old_query_params.append(urlparse.quote(
                 query_param_name.encode('utf8'), safe='')
                 + "="
-                + urllib.quote(query_param_val.encode('utf8'), safe=''))
+                + urlparse.quote(query_param_val.encode('utf8'), safe=''))
 
     return old_query_params
 
@@ -394,11 +417,11 @@ def _get_old_query_params_except_offset(new_query_params, parsed_uri):
     if parsed_uri.query:
 
         for query_param in parsed_uri.query.split('&'):
-            query_param_name, query_param_val = query_param.split('=')
+            query_param_name, query_param_val = query_param.split('=', 1)
             if query_param_name.lower() != 'offset':
-                new_query_params.append(urllib.quote(
+                new_query_params.append(urlparse.quote(
                     query_param_name.encode(
-                        'utf8'), safe='') + "=" + urllib.quote(
+                        'utf8'), safe='') + "=" + urlparse.quote(
                     query_param_val.encode(
                         'utf8'), safe=''))
 
@@ -423,7 +446,7 @@ def paginate_statistics(statistic, uri, limit):
 
         next_link = build_base_uri(parsed_uri)
 
-        new_query_params = [u'offset' + '=' + urllib.quote(
+        new_query_params = [u'offset' + '=' + urlparse.quote(
             new_offset.encode('utf8'), safe='')]
 
         _get_old_query_params_except_offset(new_query_params, parsed_uri)
@@ -431,12 +454,11 @@ def paginate_statistics(statistic, uri, limit):
         if new_query_params:
             next_link += '?' + '&'.join(new_query_params)
 
-        truncated_statistic = {u'dimensions': statistic[0]['dimensions'],
-                               u'statistics': (statistic[0]['statistics'][
-                                               :limit]),
-                               u'name': statistic[0]['name'],
-                               u'columns': statistic[0]['columns'],
-                               u'id': new_offset}
+        truncated_statistic = [{u'dimensions': statistic[0]['dimensions'],
+                                u'statistics': (statistic[0]['statistics'][:limit]),
+                                u'name': statistic[0]['name'],
+                                u'columns': statistic[0]['columns'],
+                                u'id': new_offset}]
 
         resource = {u'links': ([{u'rel': u'self',
                                  u'href': self_link.decode('utf8')},
@@ -451,6 +473,21 @@ def paginate_statistics(statistic, uri, limit):
                     u'elements': statistic}
 
     return resource
+
+
+def create_alarms_count_next_link(uri, offset, limit):
+    if offset is None:
+            offset = 0
+    parsed_url = urlparse.urlparse(uri)
+    base_url = build_base_uri(parsed_url)
+    new_query_params = [u'offset=' + urlparse.quote(str(offset + limit))]
+    _get_old_query_params_except_offset(new_query_params, parsed_url)
+
+    next_link = base_url
+    if new_query_params:
+        next_link += '?' + '&'.join(new_query_params)
+
+    return next_link
 
 
 def build_base_uri(parsed_uri):
@@ -507,9 +544,7 @@ def read_http_resource(req):
         return json_msg
     except ValueError as ex:
         LOG.debug(ex)
-        raise falcon.HTTPBadRequest(
-            'Bad request',
-            'Request body is not valid JSON')
+        raise HTTPUnprocessableEntityError('Unprocessable Entity', 'Request body is not valid JSON')
 
 
 def raise_not_found_exception(resource_name, resource_id, tenant_id):
@@ -547,10 +582,8 @@ def get_limit(req):
             else:
                 return limit
         else:
-            raise falcon.HTTPBadRequest("Invalid limit",
-                                        "Limit "
-                                        "parameter must "
-                                        "be "
-                                        "an integer")
+            raise HTTPUnprocessableEntityError("Invalid limit",
+                                               "Limit parameter must "
+                                               "be a positive integer")
     else:
         return constants.PAGE_LIMIT
