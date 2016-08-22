@@ -52,10 +52,11 @@ class Metrics(metrics_api_v2.MetricsV2API):
         try:
             super(Metrics, self).__init__()
             self._region = cfg.CONF.region
-            self._default_authorized_roles = (
-                cfg.CONF.security.default_authorized_roles)
             self._delegate_authorized_roles = (
                 cfg.CONF.security.delegate_authorized_roles)
+            self._get_metrics_authorized_roles = (
+                cfg.CONF.security.default_authorized_roles +
+                cfg.CONF.security.read_only_authorized_roles)
             self._post_metrics_authorized_roles = (
                 cfg.CONF.security.default_authorized_roles +
                 cfg.CONF.security.agent_authorized_roles)
@@ -129,7 +130,7 @@ class Metrics(metrics_api_v2.MetricsV2API):
         res.status = falcon.HTTP_204
 
     def on_get(self, req, res):
-        helpers.validate_authorization(req, self._default_authorized_roles)
+        helpers.validate_authorization(req, self._get_metrics_authorized_roles)
         tenant_id = helpers.get_tenant_id(req)
         name = helpers.get_query_name(req)
         helpers.validate_query_name(name)
@@ -152,10 +153,11 @@ class MetricsMeasurements(metrics_api_v2.MetricsMeasurementsV2API):
         try:
             super(MetricsMeasurements, self).__init__()
             self._region = cfg.CONF.region
-            self._default_authorized_roles = (
-                cfg.CONF.security.default_authorized_roles)
             self._delegate_authorized_roles = (
                 cfg.CONF.security.delegate_authorized_roles)
+            self._get_metrics_authorized_roles = (
+                cfg.CONF.security.default_authorized_roles +
+                cfg.CONF.security.read_only_authorized_roles)
             self._post_metrics_authorized_roles = (
                 cfg.CONF.security.default_authorized_roles +
                 cfg.CONF.security.agent_authorized_roles)
@@ -168,7 +170,7 @@ class MetricsMeasurements(metrics_api_v2.MetricsMeasurementsV2API):
                                                  ex.message)
 
     def on_get(self, req, res):
-        helpers.validate_authorization(req, self._default_authorized_roles)
+        helpers.validate_authorization(req, self._get_metrics_authorized_roles)
         tenant_id = helpers.get_tenant_id(req)
         name = helpers.get_query_name(req, True)
         helpers.validate_query_name(name)
@@ -212,8 +214,9 @@ class MetricsStatistics(metrics_api_v2.MetricsStatisticsV2API):
         try:
             super(MetricsStatistics, self).__init__()
             self._region = cfg.CONF.region
-            self._default_authorized_roles = (
-                cfg.CONF.security.default_authorized_roles)
+            self._get_metrics_authorized_roles = (
+                cfg.CONF.security.default_authorized_roles +
+                cfg.CONF.security.read_only_authorized_roles)
             self._metrics_repo = simport.load(
                 cfg.CONF.repositories.metrics_driver)()
 
@@ -223,7 +226,7 @@ class MetricsStatistics(metrics_api_v2.MetricsStatisticsV2API):
                                                  ex.message)
 
     def on_get(self, req, res):
-        helpers.validate_authorization(req, self._default_authorized_roles)
+        helpers.validate_authorization(req, self._get_metrics_authorized_roles)
         tenant_id = helpers.get_tenant_id(req)
         name = helpers.get_query_name(req, True)
         helpers.validate_query_name(name)
@@ -270,8 +273,9 @@ class MetricsNames(metrics_api_v2.MetricsNamesV2API):
         try:
             super(MetricsNames, self).__init__()
             self._region = cfg.CONF.region
-            self._default_authorized_roles = (
-                cfg.CONF.security.default_authorized_roles)
+            self._get_metrics_authorized_roles = (
+                cfg.CONF.security.default_authorized_roles +
+                cfg.CONF.security.read_only_authorized_roles)
             self._metrics_repo = simport.load(
                 cfg.CONF.repositories.metrics_driver)()
 
@@ -281,7 +285,7 @@ class MetricsNames(metrics_api_v2.MetricsNamesV2API):
                                                  ex.message)
 
     def on_get(self, req, res):
-        helpers.validate_authorization(req, self._default_authorized_roles)
+        helpers.validate_authorization(req, self._get_metrics_authorized_roles)
         tenant_id = helpers.get_tenant_id(req)
         dimensions = helpers.get_query_dimensions(req)
         helpers.validate_query_dimensions(dimensions)
@@ -302,3 +306,45 @@ class MetricsNames(metrics_api_v2.MetricsNamesV2API):
                                                       offset, limit)
 
         return helpers.paginate(result, req_uri, limit)
+
+
+class DimensionValues(metrics_api_v2.DimensionValuesV2API):
+    def __init__(self):
+        try:
+            super(DimensionValues, self).__init__()
+            self._region = cfg.CONF.region
+            self._get_metrics_authorized_roles = (
+                cfg.CONF.security.default_authorized_roles +
+                cfg.CONF.security.read_only_authorized_roles)
+            self._metrics_repo = simport.load(
+                cfg.CONF.repositories.metrics_driver)()
+
+        except Exception as ex:
+            LOG.exception(ex)
+            raise falcon.HTTPInternalServerError('Service unavailable',
+                                                 ex.message)
+
+    def on_get(self, req, res):
+        helpers.validate_authorization(req, self._get_metrics_authorized_roles)
+        tenant_id = helpers.get_tenant_id(req)
+        metric_name = helpers.get_query_param(req, 'metric_name')
+        dimension_name = helpers.get_query_param(req, 'dimension_name', required=True)
+        offset = helpers.get_query_param(req, 'offset')
+        limit = helpers.get_limit(req)
+        result = self._dimension_values(tenant_id, req.uri, metric_name,
+                                        dimension_name, offset, limit)
+        res.body = helpers.dumpit_utf8(result)
+        res.status = falcon.HTTP_200
+
+    @resource.resource_try_catch_block
+    def _dimension_values(self, tenant_id, req_uri, metric_name,
+                          dimension_name, offset, limit):
+
+        result = self._metrics_repo.list_dimension_values(tenant_id,
+                                                          self._region,
+                                                          metric_name,
+                                                          dimension_name,
+                                                          offset,
+                                                          limit)
+
+        return helpers.paginate_dimension_values(result, req_uri, offset, limit)

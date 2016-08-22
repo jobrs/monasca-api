@@ -1,5 +1,5 @@
 # Copyright 2014 IBM Corp
-# Copyright 2015-2016 Hewlett Packard Enterprise Development Company LP
+# Copyright 2015-2016 Hewlett Packard Enterprise Development LP
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -43,7 +43,11 @@ dispatcher_opts = [cfg.StrOpt('versions', default=None,
                    cfg.StrOpt('alarms_state_history', default=None,
                               help='Alarms state history'),
                    cfg.StrOpt('notification_methods', default=None,
-                              help='Notification methods')]
+                              help='Notification methods'),
+                   cfg.StrOpt('dimension_values', default=None,
+                              help='Dimension values'),
+                   cfg.StrOpt('notification_method_types', default=None,
+                              help='notification_method_types methods')]
 
 dispatcher_group = cfg.OptGroup(name='dispatcher', title='dispatcher')
 cfg.CONF.register_group(dispatcher_group)
@@ -108,6 +112,13 @@ def launch(conf, config_file="/etc/monasca/api-config.conf"):
     app.add_route("/v2.0/notification-methods/{notification_method_id}",
                   notification_methods)
 
+    dimension_values = simport.load(cfg.CONF.dispatcher.dimension_values)()
+    app.add_route("/v2.0/metrics/dimensions/names/values", dimension_values)
+
+    notification_method_types = simport.load(
+        cfg.CONF.dispatcher.notification_method_types)()
+    app.add_route("/v2.0/notification-methods/types", notification_method_types)
+
     LOG.debug('Dispatcher drivers have been added to the routes!')
     return app
 
@@ -116,5 +127,5 @@ if __name__ == '__main__':
     wsgi_app = (
         paste.deploy.loadapp('config:etc/api-config.ini',
                              relative_to=os.getcwd()))
-    httpd = simple_server.make_server('127.0.0.1', 8080, wsgi_app)
+    httpd = simple_server.make_server('127.0.0.1', 8070, wsgi_app)
     httpd.serve_forever()

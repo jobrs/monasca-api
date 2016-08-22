@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2014 Hewlett-Packard Development Company, L.P.
- * 
+ * (C) Copyright 2014,2016 Hewlett Packard Enterprise Development LP
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software distributed under the License
  * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
  * or implied. See the License for the specific language governing permissions and limitations under
@@ -38,9 +38,11 @@ import monasca.api.infrastructure.servlet.PreAuthenticationFilter;
 import monasca.api.infrastructure.servlet.RoleAuthorizationFilter;
 import monasca.api.resource.AlarmDefinitionResource;
 import monasca.api.resource.AlarmResource;
+import monasca.api.resource.DimensionResource;
 import monasca.api.resource.MeasurementResource;
 import monasca.api.resource.MetricResource;
 import monasca.api.resource.NotificationMethodResource;
+import monasca.api.resource.NotificationMethodTypesResource;
 import monasca.api.resource.StatisticResource;
 import monasca.api.resource.VersionResource;
 import monasca.api.resource.exception.ConstraintViolationExceptionMapper;
@@ -107,10 +109,12 @@ public class MonApiApplication extends Application<ApiConfig> {
     environment.jersey().register(Injector.getInstance(VersionResource.class));
     environment.jersey().register(Injector.getInstance(AlarmDefinitionResource.class));
     environment.jersey().register(Injector.getInstance(AlarmResource.class));
+    environment.jersey().register(Injector.getInstance(DimensionResource.class));
     environment.jersey().register(Injector.getInstance(MetricResource.class));
     environment.jersey().register(Injector.getInstance(MeasurementResource.class));
     environment.jersey().register(Injector.getInstance(StatisticResource.class));
     environment.jersey().register(Injector.getInstance(NotificationMethodResource.class));
+    environment.jersey().register(Injector.getInstance(NotificationMethodTypesResource.class));
 
     /** Configure providers */
     removeExceptionMappers(environment.jersey().getResourceConfig().getSingletons());
@@ -208,7 +212,8 @@ public class MonApiApplication extends Application<ApiConfig> {
           environment.servlets().addFilter(
               "post-auth",
               new PostAuthenticationFilter(config.middleware.defaultAuthorizedRoles,
-                  config.middleware.agentAuthorizedRoles));
+                                           config.middleware.agentAuthorizedRoles,
+                                           config.middleware.readOnlyAuthorizedRoles));
       postAuthenticationFilter.addMappingForUrlPatterns(null, true, "/");
       postAuthenticationFilter.addMappingForUrlPatterns(null, true, "/v2.0/*");
 

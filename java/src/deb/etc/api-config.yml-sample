@@ -82,6 +82,7 @@ middleware:
   connRetryTimes: 2
   connRetryInterval: 50
   defaultAuthorizedRoles: [user, domainuser, domainadmin, monasca-user]
+  readOnlyAuthorizedRoles: [monasca-read-only-user]
   agentAuthorizedRoles: [monasca-agent]
   adminAuthMethod: password
   adminUser: admin
@@ -99,7 +100,7 @@ middleware:
 server:
   applicationConnectors:
     - type: http
-      port: 8080
+      port: 8070
       maxRequestHeaderSize: 16KiB  # Allow large headers used by keystone tokens
   requestLog:
    timeZone: UTC

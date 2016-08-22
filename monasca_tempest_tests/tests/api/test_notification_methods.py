@@ -1,4 +1,4 @@
-# (C) Copyright 2015-2016 Hewlett Packard Enterprise Development Company LP
+# (C) Copyright 2015-2016 Hewlett Packard Enterprise Development LP
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -155,7 +155,7 @@ class TestNotificationMethods(base.BaseMonascaTest):
     @test.attr(type=['negative'])
     def test_create_notification_method_with_invalid_type(self):
         notification = helpers.create_notification(type='random')
-        self.assertRaises((exceptions.BadRequest, exceptions.UnprocessableEntity),
+        self.assertRaises((exceptions.BadRequest, exceptions.NotFound, exceptions.UnprocessableEntity),
                           self.monasca_client.create_notifications,
                           notification)
 
@@ -543,7 +543,7 @@ class TestNotificationMethods(base.BaseMonascaTest):
             notification)
         id = response_body['id']
         self.assertEqual(201, resp.status)
-        self.assertRaises((exceptions.BadRequest, exceptions.UnprocessableEntity),
+        self.assertRaises((exceptions.BadRequest, exceptions.NotFound, exceptions.UnprocessableEntity),
                           self.monasca_client.update_notification_method, id,
                           name=response_body['name'], type='random',
                           address=response_body['address'], period=0)
@@ -765,6 +765,44 @@ class TestNotificationMethods(base.BaseMonascaTest):
         self.assertEqual(204, resp.status)
 
     @test.attr(type="gate")
+    def test_patch_notification_method_address_period(self):
+        type = 'WEBHOOK'
+        notification = helpers.create_notification(
+            type=type, address='http://localhost/test01', period=60)
+        resp, response_body = self.monasca_client.create_notifications(
+            notification)
+        self.assertEqual(201, resp.status)
+        self.assertEqual(type, response_body['type'])
+        id = response_body['id']
+
+        # test_patch_webhook_notification_to_email_with_zero_period
+        new_type = 'EMAIL'
+        new_period = 0
+        resp, response_body = \
+            self.monasca_client.\
+            patch_notification_method(id, type=new_type,
+                                      address='john.doe@domain.com',
+                                      period=new_period)
+        self.assertEqual(200, resp.status)
+        self.assertEqual(new_type, response_body['type'])
+        self.assertEqual(new_period, response_body['period'])
+
+        # test_patch_email_notification_to_webhook_with_nonzero_period
+        new_type = 'WEBHOOK'
+        new_period = 60
+        resp, response_body = \
+            self.monasca_client.\
+            patch_notification_method(id, type=new_type,
+                                      address='http://localhost/test01',
+                                      period=new_period)
+        self.assertEqual(200, resp.status)
+        self.assertEqual(new_type, response_body['type'])
+        self.assertEqual(new_period, response_body['period'])
+        resp, response_body = self.monasca_client.\
+            delete_notification_method(id)
+        self.assertEqual(204, resp.status)
+
+    @test.attr(type="gate")
     @test.attr(type=['negative'])
     def test_patch_notification_method_name_exceeds_max_length(self):
         name = data_utils.rand_name('notification-')
@@ -791,7 +829,7 @@ class TestNotificationMethods(base.BaseMonascaTest):
             notification)
         id = response_body['id']
         self.assertEqual(201, resp.status)
-        self.assertRaises((exceptions.BadRequest, exceptions.UnprocessableEntity),
+        self.assertRaises((exceptions.BadRequest, exceptions.NotFound, exceptions.UnprocessableEntity),
                           self.monasca_client.patch_notification_method, id, type='random')
         resp, response_body = \
             self.monasca_client.delete_notification_method(id)
