@@ -16,11 +16,14 @@ Document Version: v2.0
   - [Measurement](#measurement)
     - [Value Meta](#value-meta)
   - [Alarm Definitions and Alarms](#alarm-definitions-and-alarms)
+    - [Deterministic or non-deterministic alarms](#deterministic-or-non-deterministic-alarms)
   - [Alarm Definition Expressions](#alarm-definition-expressions)
     - [Syntax](#syntax)
       - [Simple Example](#simple-example)
       - [More Complex Example](#more-complex-example)
       - [Compound alarm example](#compound-alarm-example)
+      - [Deterministic alarm example](#deterministic-alarm-example)
+      - [Non-deterministic alarm with deterministic sub expressions](#non-deterministic-alarm-with-deterministic-sub-expressions)
     - [Changing Alarm Definitions](#changing-alarm-definitions)
   - [Notification Methods](#notification-methods)
 - [Common Request Headers](#common-request-headers)
@@ -79,9 +82,8 @@ Document Version: v2.0
       - [Status Code](#status-code-1)
       - [Response Body](#response-body-3)
       - [Response Examples](#response-examples-2)
-- [Measurements](#measurements)
-  - [List measurements](#list-measurements)
-    - [GET /v2.0/metrics/measurements](#get-v20metricsmeasurements)
+  - [List dimension values](#list-dimension-values)
+      - [GET /v2.0/metrics/dimensions/names/values](#get-v20metricsdimensionsnamesvalues)
       - [Headers](#headers-4)
       - [Path Parameters](#path-parameters-4)
       - [Query Parameters](#query-parameters-4)
@@ -91,9 +93,9 @@ Document Version: v2.0
       - [Status Code](#status-code-2)
       - [Response Body](#response-body-4)
       - [Response Examples](#response-examples-3)
-- [Metric Names](#metric-names)
-  - [List names](#list-names)
-    - [GET /v2.0/metrics/names](#get-v20metricsnames)
+- [Measurements](#measurements)
+  - [List measurements](#list-measurements)
+    - [GET /v2.0/metrics/measurements](#get-v20metricsmeasurements)
       - [Headers](#headers-5)
       - [Path Parameters](#path-parameters-5)
       - [Query Parameters](#query-parameters-5)
@@ -103,9 +105,9 @@ Document Version: v2.0
       - [Status Code](#status-code-3)
       - [Response Body](#response-body-5)
       - [Response Examples](#response-examples-4)
-- [Statistics](#statistics)
-  - [List statistics](#list-statistics)
-    - [GET /v2.0/metrics/statistics](#get-v20metricsstatistics)
+- [Metric Names](#metric-names)
+  - [List names](#list-names)
+    - [GET /v2.0/metrics/names](#get-v20metricsnames)
       - [Headers](#headers-6)
       - [Path Parameters](#path-parameters-6)
       - [Query Parameters](#query-parameters-6)
@@ -115,9 +117,9 @@ Document Version: v2.0
       - [Status Code](#status-code-4)
       - [Response Body](#response-body-6)
       - [Response Examples](#response-examples-5)
-- [Notification Methods](#notification-methods-1)
-  - [Create Notification Method](#create-notification-method)
-    - [POST /v2.0/notification-methods](#post-v20notification-methods)
+- [Statistics](#statistics)
+  - [List statistics](#list-statistics)
+    - [GET /v2.0/metrics/statistics](#get-v20metricsstatistics)
       - [Headers](#headers-7)
       - [Path Parameters](#path-parameters-7)
       - [Query Parameters](#query-parameters-7)
@@ -127,8 +129,9 @@ Document Version: v2.0
       - [Status Code](#status-code-5)
       - [Response Body](#response-body-7)
       - [Response Examples](#response-examples-6)
-  - [List Notification Methods](#list-notification-methods)
-    - [GET /v2.0/notification-methods](#get-v20notification-methods)
+- [Notification Methods](#notification-methods-1)
+  - [Create Notification Method](#create-notification-method)
+    - [POST /v2.0/notification-methods](#post-v20notification-methods)
       - [Headers](#headers-8)
       - [Path Parameters](#path-parameters-8)
       - [Query Parameters](#query-parameters-8)
@@ -138,8 +141,8 @@ Document Version: v2.0
       - [Status Code](#status-code-6)
       - [Response Body](#response-body-8)
       - [Response Examples](#response-examples-7)
-  - [Get Notification Method](#get-notification-method)
-    - [GET /v2.0/notification-methods/{notification_method_id}](#get-v20notification-methodsnotification_method_id)
+  - [List Notification Methods](#list-notification-methods)
+    - [GET /v2.0/notification-methods](#get-v20notification-methods)
       - [Headers](#headers-9)
       - [Path Parameters](#path-parameters-9)
       - [Query Parameters](#query-parameters-9)
@@ -149,30 +152,19 @@ Document Version: v2.0
       - [Status Code](#status-code-7)
       - [Response Body](#response-body-9)
       - [Response Examples](#response-examples-8)
+  - [Get Notification Method](#get-notification-method)
+    - [GET /v2.0/notification-methods/{notification_method_id}](#get-v20notification-methodsnotification_method_id)
+      - [Headers](#headers-10)
+      - [Path Parameters](#path-parameters-10)
+      - [Query Parameters](#query-parameters-10)
+      - [Request Body](#request-body-10)
+      - [Request Examples](#request-examples-10)
+    - [Response](#response-10)
+      - [Status Code](#status-code-8)
+      - [Response Body](#response-body-10)
+      - [Response Examples](#response-examples-9)
   - [Update Notification Method](#update-notification-method)
     - [PUT /v2.0/notification-methods/{notification_method_id}](#put-v20notification-methodsnotification_method_id)
-      - [Headers](#headers-10)
-      - [Path Parameters](#path-parameters-10)
-      - [Query Parameters](#query-parameters-10)
-      - [Request Body](#request-body-10)
-      - [Request Examples](#request-examples-10)
-    - [Response](#response-10)
-      - [Status Code](#status-code-8)
-      - [Response Body](#response-body-10)
-      - [Response Examples](#response-examples-9)
-  - [Patch Notification Method](#patch-notification-method)
-    - [PATCH /v2.0/notification-methods/{notification_method_id}](#put-v20notification-methodsnotification_method_id)
-      - [Headers](#headers-10)
-      - [Path Parameters](#path-parameters-10)
-      - [Query Parameters](#query-parameters-10)
-      - [Request Body](#request-body-10)
-      - [Request Examples](#request-examples-10)
-    - [Response](#response-10)
-      - [Status Code](#status-code-8)
-      - [Response Body](#response-body-10)
-      - [Response Examples](#response-examples-9)
-  - [Delete Notification Method](#delete-notification-method)
-    - [DELETE /v2.0/notification-methods/{notification_method_id}](#delete-v20notification-methodsnotification_method_id)
       - [Headers](#headers-11)
       - [Path Parameters](#path-parameters-11)
       - [Query Parameters](#query-parameters-11)
@@ -181,9 +173,9 @@ Document Version: v2.0
     - [Response](#response-11)
       - [Status Code](#status-code-9)
       - [Response Body](#response-body-11)
-- [Alarm Definitions](#alarm-definitions)
-  - [Create Alarm Definition](#create-alarm-definition)
-    - [POST /v2.0/alarm-definitions](#post-v20alarm-definitions)
+      - [Response Examples](#response-examples-10)
+  - [Patch Notification Method](#patch-notification-method)
+    - [PATCH /v2.0/notification-methods/{notification_method_id}](#patch-v20notification-methodsnotification_method_id)
       - [Headers](#headers-12)
       - [Path Parameters](#path-parameters-12)
       - [Query Parameters](#query-parameters-12)
@@ -192,9 +184,9 @@ Document Version: v2.0
     - [Response](#response-12)
       - [Status Code](#status-code-10)
       - [Response Body](#response-body-12)
-      - [Response Examples](#response-examples-10)
-  - [List Alarm Definitions](#list-alarm-definitions)
-    - [GET /v2.0/alarm-definitions](#get-v20alarm-definitions)
+      - [Response Examples](#response-examples-11)
+  - [Delete Notification Method](#delete-notification-method)
+    - [DELETE /v2.0/notification-methods/{notification_method_id}](#delete-v20notification-methodsnotification_method_id)
       - [Headers](#headers-13)
       - [Path Parameters](#path-parameters-13)
       - [Query Parameters](#query-parameters-13)
@@ -203,135 +195,156 @@ Document Version: v2.0
     - [Response](#response-13)
       - [Status Code](#status-code-11)
       - [Response Body](#response-body-13)
-      - [Response Examples](#response-examples-11)
-  - [Get Alarm Definition](#get-alarm-definition)
-    - [GET /v2.0/alarm-definitions/{alarm_definition_id}](#get-v20alarm-definitionsalarm_definition_id)
+  - [List supported Notification Method Types](#list-supported-notification-method-types)
+    - [GET /v2.0/notification-methods/types/](#get-v20notification-methodstypes)
       - [Headers](#headers-14)
-      - [Path Parameters](#path-parameters-14)
       - [Query Parameters](#query-parameters-14)
       - [Request Body](#request-body-14)
+      - [Request Examples](#request-examples-14)
     - [Response](#response-14)
       - [Status Code](#status-code-12)
       - [Response Body](#response-body-14)
       - [Response Examples](#response-examples-12)
-  - [Update Alarm Definition](#update-alarm-definition)
-    - [PUT /v2.0/alarm-definitions/{alarm_definition_id}](#put-v20alarm-definitionsalarm_definition_id)
+- [Alarm Definitions](#alarm-definitions)
+  - [Create Alarm Definition](#create-alarm-definition)
+    - [POST /v2.0/alarm-definitions](#post-v20alarm-definitions)
       - [Headers](#headers-15)
-      - [Path Parameters](#path-parameters-15)
+      - [Path Parameters](#path-parameters-14)
       - [Query Parameters](#query-parameters-15)
       - [Request Body](#request-body-15)
-      - [Request Examples](#request-examples-14)
+      - [Request Examples](#request-examples-15)
     - [Response](#response-15)
       - [Status Code](#status-code-13)
       - [Response Body](#response-body-15)
       - [Response Examples](#response-examples-13)
-  - [Patch Alarm Definition](#patch-alarm-definition)
-    - [PATCH /v2.0/alarm-definitions/{alarm_definition_id}](#patch-v20alarm-definitionsalarm_definition_id)
+  - [List Alarm Definitions](#list-alarm-definitions)
+    - [GET /v2.0/alarm-definitions](#get-v20alarm-definitions)
       - [Headers](#headers-16)
-      - [Path Parameters](#path-parameters-16)
+      - [Path Parameters](#path-parameters-15)
       - [Query Parameters](#query-parameters-16)
       - [Request Body](#request-body-16)
-      - [Request Examples](#request-examples-15)
+      - [Request Examples](#request-examples-16)
     - [Response](#response-16)
       - [Status Code](#status-code-14)
       - [Response Body](#response-body-16)
       - [Response Examples](#response-examples-14)
-  - [Delete Alarm Definition](#delete-alarm-definition)
-    - [DELETE /v2.0/alarm-definitions/{alarm_definition_id}](#delete-v20alarm-definitionsalarm_definition_id)
+  - [Get Alarm Definition](#get-alarm-definition)
+    - [GET /v2.0/alarm-definitions/{alarm_definition_id}](#get-v20alarm-definitionsalarm_definition_id)
       - [Headers](#headers-17)
-      - [Path Parameters](#path-parameters-17)
+      - [Path Parameters](#path-parameters-16)
       - [Query Parameters](#query-parameters-17)
       - [Request Body](#request-body-17)
-      - [Request Examples](#request-examples-16)
     - [Response](#response-17)
       - [Status Code](#status-code-15)
       - [Response Body](#response-body-17)
-- [Alarms](#alarms)
-  - [List Alarms](#list-alarms)
-    - [GET /v2.0/alarms](#get-v20alarms)
+      - [Response Examples](#response-examples-15)
+  - [Update Alarm Definition](#update-alarm-definition)
+    - [PUT /v2.0/alarm-definitions/{alarm_definition_id}](#put-v20alarm-definitionsalarm_definition_id)
       - [Headers](#headers-18)
-      - [Path Parameters](#path-parameters-18)
+      - [Path Parameters](#path-parameters-17)
       - [Query Parameters](#query-parameters-18)
       - [Request Body](#request-body-18)
       - [Request Examples](#request-examples-17)
     - [Response](#response-18)
       - [Status Code](#status-code-16)
       - [Response Body](#response-body-18)
-      - [Response Examples](#response-examples-15)
-  - [Get Alarm Counts](#get-alarm-counts)
-    - [GET /v2.0/alarms/count](#get-v20alarmscount)
+      - [Response Examples](#response-examples-16)
+  - [Patch Alarm Definition](#patch-alarm-definition)
+    - [PATCH /v2.0/alarm-definitions/{alarm_definition_id}](#patch-v20alarm-definitionsalarm_definition_id)
       - [Headers](#headers-19)
-      - [Path Parameters](#path-parameters-19)
+      - [Path Parameters](#path-parameters-18)
       - [Query Parameters](#query-parameters-19)
       - [Request Body](#request-body-19)
       - [Request Examples](#request-examples-18)
     - [Response](#response-19)
       - [Status Code](#status-code-17)
       - [Response Body](#response-body-19)
-      - [Response Example](#response-example)
-  - [List Alarms State History](#list-alarms-state-history)
-    - [GET /v2.0/alarms/state-history](#get-v20alarmsstate-history)
+      - [Response Examples](#response-examples-17)
+  - [Delete Alarm Definition](#delete-alarm-definition)
+    - [DELETE /v2.0/alarm-definitions/{alarm_definition_id}](#delete-v20alarm-definitionsalarm_definition_id)
       - [Headers](#headers-20)
-      - [Path Parameters](#path-parameters-20)
+      - [Path Parameters](#path-parameters-19)
       - [Query Parameters](#query-parameters-20)
       - [Request Body](#request-body-20)
+      - [Request Examples](#request-examples-19)
     - [Response](#response-20)
       - [Status Code](#status-code-18)
       - [Response Body](#response-body-20)
-      - [Response Examples](#response-examples-16)
-  - [Get Alarm](#get-alarm)
-    - [GET /v2.0/alarms/{alarm_id}](#get-v20alarmsalarm_id)
+- [Alarms](#alarms)
+  - [List Alarms](#list-alarms)
+    - [GET /v2.0/alarms](#get-v20alarms)
       - [Headers](#headers-21)
-      - [Path Parameters](#path-parameters-21)
+      - [Path Parameters](#path-parameters-20)
       - [Query Parameters](#query-parameters-21)
       - [Request Body](#request-body-21)
+      - [Request Examples](#request-examples-20)
     - [Response](#response-21)
       - [Status Code](#status-code-19)
       - [Response Body](#response-body-21)
-      - [Response Examples](#response-examples-17)
-  - [Update Alarm](#update-alarm)
-    - [PUT /v2.0/alarms/{alarm_id}](#put-v20alarmsalarm_id)
+      - [Response Examples](#response-examples-18)
+  - [List Alarms State History](#list-alarms-state-history)
+    - [GET /v2.0/alarms/state-history](#get-v20alarmsstate-history)
       - [Headers](#headers-22)
-      - [Path Parameters](#path-parameters-22)
+      - [Path Parameters](#path-parameters-21)
       - [Query Parameters](#query-parameters-22)
       - [Request Body](#request-body-22)
-      - [Request Examples](#request-examples-19)
     - [Response](#response-22)
       - [Status Code](#status-code-20)
       - [Response Body](#response-body-22)
-      - [Response Examples](#response-examples-18)
-  - [Patch Alarm](#patch-alarm)
-    - [PATCH /v2.0/alarms/{alarm_id}](#patch-v20alarmsalarm_id)
+      - [Response Examples](#response-examples-19)
+  - [Get Alarm](#get-alarm)
+    - [GET /v2.0/alarms/{alarm_id}](#get-v20alarmsalarm_id)
       - [Headers](#headers-23)
-      - [Path Parameters](#path-parameters-23)
+      - [Path Parameters](#path-parameters-22)
       - [Query Parameters](#query-parameters-23)
       - [Request Body](#request-body-23)
-      - [Request Examples](#request-examples-20)
     - [Response](#response-23)
       - [Status Code](#status-code-21)
       - [Response Body](#response-body-23)
-      - [Response Examples](#response-examples-19)
-  - [Delete Alarm](#delete-alarm)
-    - [DELETE /v2.0/alarms/{alarm_id}](#delete-v20alarmsalarm_id)
+      - [Response Examples](#response-examples-20)
+  - [Update Alarm](#update-alarm)
+    - [PUT /v2.0/alarms/{alarm_id}](#put-v20alarmsalarm_id)
       - [Headers](#headers-24)
-      - [Path Parameters](#path-parameters-24)
+      - [Path Parameters](#path-parameters-23)
       - [Query Parameters](#query-parameters-24)
       - [Request Body](#request-body-24)
       - [Request Examples](#request-examples-21)
     - [Response](#response-24)
       - [Status Code](#status-code-22)
       - [Response Body](#response-body-24)
-  - [List Alarm State History](#list-alarm-state-history)
-    - [GET /v2.0/alarms/{alarm_id}/state-history](#get-v20alarmsalarm_idstate-history)
+      - [Response Examples](#response-examples-21)
+  - [Patch Alarm](#patch-alarm)
+    - [PATCH /v2.0/alarms/{alarm_id}](#patch-v20alarmsalarm_id)
       - [Headers](#headers-25)
-      - [Path Parameters](#path-parameters-25)
+      - [Path Parameters](#path-parameters-24)
       - [Query Parameters](#query-parameters-25)
       - [Request Body](#request-body-25)
-      - [Request Data](#request-data)
+      - [Request Examples](#request-examples-22)
     - [Response](#response-25)
       - [Status Code](#status-code-23)
       - [Response Body](#response-body-25)
-      - [Response Examples](#response-examples-20)
+      - [Response Examples](#response-examples-22)
+  - [Delete Alarm](#delete-alarm)
+    - [DELETE /v2.0/alarms/{alarm_id}](#delete-v20alarmsalarm_id)
+      - [Headers](#headers-26)
+      - [Path Parameters](#path-parameters-25)
+      - [Query Parameters](#query-parameters-26)
+      - [Request Body](#request-body-26)
+      - [Request Examples](#request-examples-23)
+    - [Response](#response-26)
+      - [Status Code](#status-code-24)
+      - [Response Body](#response-body-26)
+  - [List Alarm State History](#list-alarm-state-history)
+    - [GET /v2.0/alarms/{alarm_id}/state-history](#get-v20alarmsalarm_idstate-history)
+      - [Headers](#headers-27)
+      - [Path Parameters](#path-parameters-26)
+      - [Query Parameters](#query-parameters-27)
+      - [Request Body](#request-body-27)
+      - [Request Data](#request-data)
+    - [Response](#response-27)
+      - [Status Code](#status-code-25)
+      - [Response Body](#response-body-27)
+      - [Response Examples](#response-examples-23)
 - [License](#license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -369,7 +382,7 @@ A measurement is a value with a timestamp for a specific Metric. The value is re
 ### Value Meta
 Optionally, a measurement may also contain extra data about the value which is known as value meta. Value meta is a set of name/value pairs that add textual data to the value of the measurement.  The value meta will be returned from the API when the measurement is read. Only measurements that were written with value meta will have the key value pairs when read from the API. The value meta is ignored when computing statistics such as average on measurements.
 
-For an example of how value meta is used, imagine this metric: http_status{url: http://localhost:8080/healthcheck, hostname=devstack, service=object-storage}.  The measurements for this metric have a value of either 1 or 0 depending if the status check succeeded. If the check fails, it would be helpful to have the actual http status code and error message if possible. So instead of just a value, the measurement will be something like:
+For an example of how value meta is used, imagine this metric: http_status{url: http://localhost:8070/healthcheck, hostname=devstack, service=object-storage}.  The measurements for this metric have a value of either 1 or 0 depending if the status check succeeded. If the check fails, it would be helpful to have the actual http status code and error message if possible. So instead of just a value, the measurement will be something like:
 {Timestamp=now(), value=1, value_meta{http_rc=500, error=“Error accessing MySQL”}}
 
 Up to 16 separate key/value pairs of value meta are allowed per measurement. The keys are required and are trimmed of leading and trailing whitespace and have a maximum length of 255 characters. The value is a string and value meta (with key, value and '{"":""}' combined) has a maximum length of 2048 characters. The value can be an empty string. Whitespace is not trimmed from the values.
@@ -732,7 +745,7 @@ The Monasca API implements a paging mechanism to allow users to 'page' through r
 For example:
 
 ```
-"http://192.168.10.4:8080/v2.0/metrics/measurements?offset=2015-03-03T05%3A21%3A55Z&limit=1000&name=cpu.system_perc&dimensions=hostname%3Adevstack&start_time=2014-07-18T03%3A00%3A00Z"
+"http://192.168.10.4:8070/v2.0/metrics/measurements?offset=2015-03-03T05%3A21%3A55Z&limit=1000&name=cpu.system_perc&dimensions=hostname%3Adevstack&start_time=2014-07-18T03%3A00%3A00Z"
 
 ```
 
@@ -774,6 +787,13 @@ offset=2104-01-01T00:00:01Z
 
 ```
 
+A dimension value offset would look as follows:
+
+```
+offset=dimensionValue2
+
+```
+
 Different resources use different offset types because of the internal implementation of different resources depends on different types of mechanisms for indexing and identifying resources. The type and form of the offsets for each resource can be determined by referring to the examples in each resource section below.
 
 The offset is determined by the ID of the last element in the result list. Users wishing to manually create a query URL can use the ID of the last element in the previously returned result set as the offset. The proceeding result set will return all elements with an ID greater than the offset up to the limit. The automatically generated offset in the next link does exactly this; it uses the ID in the last element.
@@ -801,11 +821,11 @@ For example:
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/metrics&limit=2"
+            "href": "http://192.168.10.4:8070/v2.0/metrics&limit=2"
         },
         {
             "rel": "next",
-            "href": "http://192.168.10.4:8080/v2.0/metrics?offset=1&limit=2"
+            "href": "http://192.168.10.4:8070/v2.0/metrics?offset=1&limit=2"
         }
     ],
     "elements": [
@@ -851,7 +871,7 @@ None.
 #### Request Examples
 ```
 GET / HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Accept: application/json
 Cache-Control: no-cache
@@ -870,7 +890,7 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of s
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/"
+            "href": "http://192.168.10.4:8070/"
         }
     ],
     "elements": [
@@ -879,7 +899,7 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of s
             "links": [
                 {
                     "rel": "self",
-                    "href": "http://192.168.10.4:8080/v2.0"
+                    "href": "http://192.168.10.4:8070/v2.0"
                 }
             ],
             "status": "CURRENT",
@@ -911,7 +931,7 @@ None.
 #### Request Examples
 ```
 GET /v2.0/ HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -931,7 +951,7 @@ Returns a JSON version object with details about the specified version.
    "links":[
       {
          "rel":"self",
-         "href":"http://192.168.10.4:8080/v2.0/"
+         "href":"http://192.168.10.4:8070/v2.0/"
       }
    ],
    "status":"CURRENT",
@@ -976,7 +996,7 @@ POST a single metric.
 
 ```
 POST /v2.0/metrics HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 27feed73a0ce4138934e30d619b415b0
 Cache-Control: no-cache
@@ -997,7 +1017,7 @@ POST a single metric with value_meta.
 
 ```
 POST /v2.0/metrics HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 27feed73a0ce4138934e30d619b415b0
 Cache-Control: no-cache
@@ -1022,7 +1042,7 @@ POST an array of metrics.
 
 ```
 POST /v2.0/metrics HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 27feed73a0ce4138934e30d619b415b0
 Cache-Control: no-cache
@@ -1088,7 +1108,7 @@ None.
 #### Request Examples
 ```
 GET /v2.0/metrics?name=metric1&dimensions=key1:value1 HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 27feed73a0ce4138934e30d619b415b0
 Cache-Control: no-cache
@@ -1110,11 +1130,11 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of m
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/metrics"
+            "href": "http://192.168.10.4:8070/v2.0/metrics"
         },
         {
             "rel": "next",
-            "href": "http://192.168.10.4:8080/v2.0/metrics?offset=1"
+            "href": "http://192.168.10.4:8070/v2.0/metrics?offset=1"
         }
     ],
     "elements": [
@@ -1131,6 +1151,76 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of m
             "dimensions": {
                 "key1": "value1"
             }
+        }
+    ]
+}
+````
+___
+
+## List dimension values
+Get dimension values
+
+#### GET /v2.0/metrics/dimensions/names/values
+
+#### Headers
+* X-Auth-Token (string, required) - Keystone auth token
+* Accept (string) - application/json
+
+#### Path Parameters
+None.
+
+#### Query Parameters
+* tenant_id (string, optional, restricted) - Tenant ID to from which to get dimension values. This parameter can be used to get dimension values from a tenant other than the tenant the request auth token is scoped to. Usage of this query parameter is restricted to users with the the monasca admin role, as defined in the monasca api configuration file, which defaults to `monasca-admin`.
+* metric_name (string(255), optional) - A metric name to filter dimension values by.
+* dimension_name (string(255), required) - A dimension name to filter dimension values by.
+* offset (string(255), optional) - The dimension values are returned in alphabetic order, and the offset is the dimension name after which to return in the next pagination request.
+* limit (integer, optional)
+
+#### Request Body
+None.
+
+#### Request Examples
+```
+GET /v2.0/metrics/dimensions/names/values?dimension_name=dimension_name HTTP/1.1
+Host: 192.168.10.4:8080
+Content-Type: application/json
+X-Auth-Token: 27feed73a0ce4138934e30d619b415b0
+Cache-Control: no-cache
+```
+
+### Response
+#### Status Code
+* 200 - OK
+
+#### Response Body
+Returns a JSON object with a 'links' array of links and an 'elements' array of metric definition objects with the following fields:
+
+* dimension_name (string)
+* metric_name (string)
+* values (list of strings)
+
+#### Response Examples
+````
+{
+    "links": [
+        {
+            "rel": "self",
+            "href": "http://192.168.10.4:8080/v2.0/metrics/dimensions/names/values?dimension_name=dimension_name"
+        },
+        {
+            "rel": "next",
+            "href": "http://192.168.10.4:8080/v2.0/metrics/dimensions/names/values?dimension_name=dimension_name&offset=dimensionValue2"
+        }
+    ],
+    "elements": [
+        {
+            "id": "b63d9bc1e16582d0ca039616ce3c870556b3095b",
+            "metric_name": "metric_name",
+            "dimension_name": "dimension_name",
+            "values": [
+                "dimensonValue1",
+                "dimensonValue2"
+            ]
         }
     ]
 }
@@ -1173,7 +1263,7 @@ None.
 #### Request Examples
 ```
 GET /v2.0/metrics/measurements?name=cpu.system_perc&dimensions=hostname:devstack&start_time=2015-03-00T00:00:01Z HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -1197,11 +1287,11 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of m
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/metrics/measurements?start_time=2015-03-00T00%3A00%3A00Z&name=cpu.system_perc&dimensions=hostname%3Adevstack"
+            "href": "http://192.168.10.4:8070/v2.0/metrics/measurements?start_time=2015-03-00T00%3A00%3A00Z&name=cpu.system_perc&dimensions=hostname%3Adevstack"
         },
         {
             "rel": "next",
-            "href": "http://192.168.10.4:8080/v2.0/metrics/measurements?offset=2015-03-03T05%3A24%3A55Z&name=cpu.system_perc&dimensions=hostname%3Adevstack&start_time=2015-03-00T00%3A00%3A00Z"
+            "href": "http://192.168.10.4:8070/v2.0/metrics/measurements?offset=2015-03-03T05%3A24%3A55Z&name=cpu.system_perc&dimensions=hostname%3Adevstack&start_time=2015-03-00T00%3A00%3A00Z"
         }
     ],
     "elements": [
@@ -1271,7 +1361,7 @@ None.
 #### Request Examples
 ```
 GET /v2.0/metrics/names HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -1300,11 +1390,11 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of m
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/metrics/names?offset=tenantId%3region%26name1%26dimensionKey1%3DdimensionValue1%26dimensionKey2%3DdimensionValue2"
+            "href": "http://192.168.10.4:8070/v2.0/metrics/names?offset=tenantId%3region%26name1%26dimensionKey1%3DdimensionValue1%26dimensionKey2%3DdimensionValue2"
         },
         {
             "rel": "next"
-            "href": http://192.168.10.4:8080/v2.0/metrics/names?offset=tenantId%3region%26name3%26dimensionKey1%3DdimensionValue1%26dimensionKey2%3DdimensionValue2
+            "href": http://192.168.10.4:8070/v2.0/metrics/names?offset=tenantId%3region%26name3%26dimensionKey1%3DdimensionValue1%26dimensionKey2%3DdimensionValue2
         }
     ]
 }
@@ -1349,7 +1439,7 @@ None.
 #### Request Examples
 ```
 GET /v2.0/metrics/statistics?name=cpu.system_perc&dimensions=hostname:devstack&start_time=2014-07-18T03:00:00Z&statistics=avg,min,max,sum,count HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Content-Type: application/json
 Cache-Control: no-cache
@@ -1374,11 +1464,11 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of s
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/metrics/statistics?start_time=2014-07-18T03%3A00%3A00Z&name=cpu.system_perc&dimensions=hostname%3Adevstack&statistics=avg%2Cmin%2Cmax%2Csum%2Ccount"
+            "href": "http://192.168.10.4:8070/v2.0/metrics/statistics?start_time=2014-07-18T03%3A00%3A00Z&name=cpu.system_perc&dimensions=hostname%3Adevstack&statistics=avg%2Cmin%2Cmax%2Csum%2Ccount"
         },
         {
             "rel": "next",
-            "href": "http://192.168.10.4:8080/v2.0/metrics/statistics?offset=2014-07-18T03%3A22%3A00Z&name=cpu.system_perc&dimensions=hostname%3Adevstack&start_time=2014-07-18T03%3A00%3A00Z&statistics=avg%2Cmin%2Cmax%2Csum%2Ccount"
+            "href": "http://192.168.10.4:8070/v2.0/metrics/statistics?offset=2014-07-18T03%3A22%3A00Z&name=cpu.system_perc&dimensions=hostname%3Adevstack&start_time=2014-07-18T03%3A00%3A00Z&statistics=avg%2Cmin%2Cmax%2Csum%2Ccount"
         }
     ],
     "elements": [
@@ -1456,7 +1546,7 @@ None.
 #### Request Examples
 ```
 POST /v2.0/notification-methods HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -1490,7 +1580,7 @@ Returns a JSON notification method object with the following fields:
    "links":[
       {
          "rel":"self",
-         "href":"http://192.168.10.4:8080/v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508"
+         "href":"http://192.168.10.4:8070/v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508"
       }
    ],
    "name":"Name of notification method",
@@ -1525,7 +1615,7 @@ None.
 #### Request Examples
 ```
 GET /v2.0/notification-methods HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -1552,11 +1642,11 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of n
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/notification-methods"
+            "href": "http://192.168.10.4:8070/v2.0/notification-methods"
         },
         {
             "rel": "next",
-            "href": "http://192.168.10.4:8080/v2.0/notification-methods?offset=c60ec47e-5038-4bf1-9f95-4046c6e9a759"
+            "href": "http://192.168.10.4:8070/v2.0/notification-methods?offset=c60ec47e-5038-4bf1-9f95-4046c6e9a759"
         }
     ],
     "elements": [
@@ -1565,7 +1655,7 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of n
             "links": [
                 {
                     "rel": "self",
-                    "href": "http://192.168.10.4:8080/v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508"
+                    "href": "http://192.168.10.4:8070/v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508"
                 }
             ],
             "name": "Name of notification method",
@@ -1578,7 +1668,7 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of n
             "links": [
                 {
                     "rel": "self",
-                    "href": "http://192.168.10.4:8080/v2.0/notification-methods/c60ec47e-5038-4bf1-9f95-4046c6e9a759"
+                    "href": "http://192.168.10.4:8070/v2.0/notification-methods/c60ec47e-5038-4bf1-9f95-4046c6e9a759"
                 }
             ],
             "name": "Name of notification method",
@@ -1611,7 +1701,7 @@ None.
 
 #### Request Examples
 ```
-GET http://192.168.10.4:8080/v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508
+GET http://192.168.10.4:8070/v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508
 ```
 
 ### Response
@@ -1636,7 +1726,7 @@ Returns a JSON notification method object with the following fields:
    "links":[
       {
          "rel":"self",
-         "href":"http://192.168.10.4:8080/v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508"
+         "href":"http://192.168.10.4:8070/v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508"
       }
    ],
    "name":"Name of notification method",
@@ -1672,7 +1762,7 @@ None.
 #### Request Examples
 ````
 PUT /v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508 HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -1707,7 +1797,7 @@ Returns a JSON notification method object with the following fields:
    "links":[
       {
          "rel":"self",
-         "href":"http://192.168.10.4:8080/v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508"
+         "href":"http://192.168.10.4:8070/v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508"
       }
    ],
    "name":"New name of notification method",
@@ -1743,7 +1833,7 @@ None.
 #### Request Examples
 ````
 PATCH /v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508 HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -1778,7 +1868,7 @@ Returns a JSON notification method object with the following fields:
    "links":[
       {
          "rel":"self",
-         "href":"http://192.168.10.4:8080/v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508"
+         "href":"http://192.168.10.4:8070/v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508"
       }
    ],
    "name":"New name of notification method",
@@ -1809,7 +1899,7 @@ None.
 #### Request Examples
 ```
 DELETE /v2.0/notification-methods/35cc6f1c-3a29-49fb-a6fc-d9d97d190508 HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -1823,6 +1913,67 @@ Cache-Control: no-cache
 #### Response Body
 This request does not return a response body.
 ___
+
+## List supported Notification Method Types
+List supported notification method types.
+
+### GET /v2.0/notification-methods/types/
+
+#### Headers
+* X-Auth-Token (string, required) - Keystone auth token
+
+
+#### Query Parameters
+None.
+
+#### Request Body
+None.
+
+#### Request Examples
+````
+GET /v2.0/notification-methods/types
+Host: 192.168.10.4:8070
+X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
+Cache-Control: no-cache
+
+````
+
+### Response
+
+#### Status Code
+* 200 - OK
+
+#### Response Body
+Returns a JSON list which has list of notification types supported
+
+* type (string) - List of notification methods
+
+
+#### Response Examples
+````
+{
+   "links":[
+      {
+         "rel":"self",
+         "href":"http://192.168.10.6:8070/v2.0/notification-methods/types"
+      }
+   ],
+   "elements":[
+      {
+         "type":"EMAIL"
+      },
+      {
+
+         "type":"PAGERDUTY"
+      },
+      {
+         "type":"WEBHOOK"
+      }
+   ]
+}
+````
+___
+
 
 # Alarm Definitions
 Operations for working with alarm definitions.
@@ -1857,7 +2008,7 @@ Consists of an alarm definition. An alarm has the following properties:
 #### Request Examples
 ```
 POST /v2.0/alarm-definitions HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -1885,7 +2036,7 @@ Cache-Control: no-cache
 To create deterministic definition following request should be sent:
 ```
 POST /v2.0/alarm-definitions HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -1938,7 +2089,7 @@ Returns a JSON object of alarm definition objects with the following fields:
    "links":[
       {
          "rel":"self",
-         "href":"http://192.168.10.4:8080/v2.0/alarm-definitions/b461d659-577b-4d63-9782-a99194d4a472"
+         "href":"http://192.168.10.4:8070/v2.0/alarm-definitions/b461d659-577b-4d63-9782-a99194d4a472"
       }
    ],
    "name":"Average CPU percent greater than 10",
@@ -1999,7 +2150,7 @@ None.
 #### Request Examples
 ```
 GET /v2.0/alarm-definitions?name=CPU percent greater than 10&dimensions=hostname:devstack&state=UNDETERMINED HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -2032,11 +2183,11 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of a
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/alarm-definitions?name=CPU%20percent%20greater%20than%2010&dimensions=hostname:devstack&state=UNDETERMINED"
+            "href": "http://192.168.10.4:8070/v2.0/alarm-definitions?name=CPU%20percent%20greater%20than%2010&dimensions=hostname:devstack&state=UNDETERMINED"
         },
         {
             "rel": "next",
-            "href": "http://localhost:8080/v2.0/alarm-definitions?offset=f9935bcc-9641-4cbf-8224-0993a947ea83&name=CPU%20percent%20greater%20than%2010&dimensions=hostname:devstack&state=UNDETERMINED"
+            "href": "http://localhost:8070/v2.0/alarm-definitions?offset=f9935bcc-9641-4cbf-8224-0993a947ea83&name=CPU%20percent%20greater%20than%2010&dimensions=hostname:devstack&state=UNDETERMINED"
         }
     ],
     "elements": [
@@ -2045,7 +2196,7 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of a
             "links": [
                 {
                     "rel": "self",
-                    "href": "http://192.168.10.4:8080/v2.0/alarm-definitions/f9935bcc-9641-4cbf-8224-0993a947ea83"
+                    "href": "http://192.168.10.4:8070/v2.0/alarm-definitions/f9935bcc-9641-4cbf-8224-0993a947ea83"
                 }
             ],
             "name": "CPU percent greater than 10",
@@ -2083,7 +2234,7 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of a
             "links": [
                 {
                     "rel": "self",
-                    "href": "http://192.168.10.4:8080/v2.0/alarm-definitions/g9323232-6543-4cbf-1234-0993a947ea83"
+                    "href": "http://192.168.10.4:8070/v2.0/alarm-definitions/g9323232-6543-4cbf-1234-0993a947ea83"
                 }
             ],
             "name": "Log error count exceeds 1000",
@@ -2161,7 +2312,7 @@ Returns a JSON alarm definition object with the following fields:
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/alarm-definitions/f9935bcc-9641-4cbf-8224-0993a947ea83"
+            "href": "http://192.168.10.4:8070/v2.0/alarm-definitions/f9935bcc-9641-4cbf-8224-0993a947ea83"
         }
     ],
     "name": "CPU percent greater than 10",
@@ -2231,7 +2382,7 @@ See Changing Alarm Definitions for restrictions on changing expression and match
 #### Request Examples
 ```
 PUT /v2.0/alarm-definitions/f9935bcc-9641-4cbf-8224-0993a947ea83 HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Content-Type: application/json
 Cache-Control: no-cache
@@ -2285,7 +2436,7 @@ Returns a JSON alarm definition object with the following parameters:
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/alarm-definitions/f9935bcc-9641-4cbf-8224-0993a947ea83"
+            "href": "http://192.168.10.4:8070/v2.0/alarm-definitions/f9935bcc-9641-4cbf-8224-0993a947ea83"
         }
     ],
     "name": "CPU percent greater than 15",
@@ -2353,7 +2504,7 @@ Only the parameters that are specified will be updated. See Changing Alarm Defin
 #### Request Examples
 ```
 PATCH /v2.0/alarm-definitions/f9935bcc-9641-4cbf-8224-0993a947ea83 HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Content-Type: application/json
 Cache-Control: no-cache
@@ -2406,7 +2557,7 @@ Returns a JSON alarm definition object with the following fields:
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/alarm-definitions/f9935bcc-9641-4cbf-8224-0993a947ea83"
+            "href": "http://192.168.10.4:8070/v2.0/alarm-definitions/f9935bcc-9641-4cbf-8224-0993a947ea83"
         }
     ],
     "name": "CPU percent greater than 15",
@@ -2461,7 +2612,7 @@ None.
 #### Request Examples
 ```
 DELETE /v2.0/alarm-definitions/b461d659-577b-4d63-9782-a99194d4a472 HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
 ```
@@ -2510,7 +2661,7 @@ None.
 #### Request Examples
 ```
 GET /v2.0/alarms?metric_name=cpu.system_perc&metric_dimensions=hostname:devstack&state=UNDETERMINED HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -2540,11 +2691,11 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of a
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/alarms?metric_name=cpu.system_perc&metric_dimensions=hostname%3Adevstack&state=UNDETERMINED"
+            "href": "http://192.168.10.4:8070/v2.0/alarms?metric_name=cpu.system_perc&metric_dimensions=hostname%3Adevstack&state=UNDETERMINED"
         },
         {
             "rel": "next",
-            "href": "http://192.168.10.4:8080/v2.0/alarms?offset=f9935bcc-9641-4cbf-8224-0993a947ea83&metric_name=cpu.system_perc&metric_dimensions=hostname%3Adevstack&state=UNDETERMINED"
+            "href": "http://192.168.10.4:8070/v2.0/alarms?offset=f9935bcc-9641-4cbf-8224-0993a947ea83&metric_name=cpu.system_perc&metric_dimensions=hostname%3Adevstack&state=UNDETERMINED"
         }
     ],
     "elements": [
@@ -2553,11 +2704,11 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of a
             "links": [
                 {
                     "rel": "self",
-                    "href": "http://192.168.10.4:8080/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83"
+                    "href": "http://192.168.10.4:8070/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83"
                 },
                 {
                     "rel": "state-history",
-                    "href": "http://192.168.10.4:8080/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83/state-history"
+                    "href": "http://192.168.10.4:8070/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83/state-history"
                 }
             ],
             "alarm_definition": {
@@ -2565,7 +2716,7 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of a
                 "id": "b7e5f472-7aa5-4254-a49a-463e749ae817",
                 "links": [
                     {
-                        "href": "http://192.168.10.4:8080/v2.0/alarm-definitions/b7e5f472-7aa5-4254-a49a-463e749ae817",
+                        "href": "http://192.168.10.4:8070/v2.0/alarm-definitions/b7e5f472-7aa5-4254-a49a-463e749ae817",
                         "rel": "self"
                     }
                 ],
@@ -2625,7 +2776,7 @@ None
 ####Request Examples
 ```
 GET /v2.0/alarms/count?metric_name=cpu.system_perc&metric_dimensions=hostname:devstack&group_by=state,lifecycle_state
-HTTP/1.1 Host: 192.168.10.4:8080
+HTTP/1.1 Host: 192.168.10.4:8070
 Content-Type: application/json
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
@@ -2647,7 +2798,7 @@ Returns a JSON object containing the following fields:
        "links": [
            {
                "rel": "self",
-               "href": "http://192.168.10.4:8080/v2.0/alarms/count?metric_name=cpu.system_perc&metric_dimensions=hostname%3Adevstack&group_by=state,lifecycle_state"
+               "href": "http://192.168.10.4:8070/v2.0/alarms/count?metric_name=cpu.system_perc&metric_dimensions=hostname%3Adevstack&group_by=state,lifecycle_state"
            }
        ],
        "columns": ["count", "state", "lifecycle_state"],
@@ -2709,11 +2860,11 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of a
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/alarms/state-history?dimensions=hostname%3Adevstack"
+            "href": "http://192.168.10.4:8070/v2.0/alarms/state-history?dimensions=hostname%3Adevstack"
         },
         {
             "rel": "next",
-            "href": "http://192.168.10.4:8080/v2.0/alarms/state-history?offset=1424451007004&dimensions=hostname%3Adevstack"
+            "href": "http://192.168.10.4:8070/v2.0/alarms/state-history?offset=1424451007004&dimensions=hostname%3Adevstack"
         }
     ],
     "elements": [
@@ -2884,11 +3035,11 @@ Returns a JSON alarm object with the following fields:
    "links":[
       {
          "rel":"self",
-         "href":"http://192.168.10.4:8080/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83"
+         "href":"http://192.168.10.4:8070/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83"
       },
       {
          "rel":"state-history",
-         "href":"http://192.168.10.4:8080/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83/state-history"
+         "href":"http://192.168.10.4:8070/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83/state-history"
       }
    ],
    "alarm_definition":
@@ -2899,7 +3050,7 @@ Returns a JSON alarm object with the following fields:
       "links":[
          {
             "rel":"self",
-            "href":"http://192.168.10.4:8080/v2.0/alarm-definitions/ad837fca-5564-4cbf-523-0117f7dac6ad
+            "href":"http://192.168.10.4:8070/v2.0/alarm-definitions/ad837fca-5564-4cbf-523-0117f7dac6ad
          }
       ]
    },
@@ -2945,7 +3096,7 @@ Consists of an alarm definition. An alarm has the following mutable properties:
 #### Request Examples
 ```
 PUT /v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83 HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Content-Type: application/json
 Cache-Control: no-cache
@@ -2983,11 +3134,11 @@ Returns a JSON alarm object with the following parameters:
   "links":[
      {
         "rel":"self",
-        "href":"http://192.168.10.4:8080/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83"
+        "href":"http://192.168.10.4:8070/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83"
      },
      {
         "rel":"state-history",
-        "href":"http://192.168.10.4:8080/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83/state-history"
+        "href":"http://192.168.10.4:8070/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83/state-history"
      }
   ],
   "alarm_definition_id":"ad837fca-5564-4cbf-523-0117f7dac6ad",
@@ -3032,7 +3183,7 @@ Consists of an alarm with the following mutable properties:
 #### Request Examples
 ```
 PATCH /v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83 HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Content-Type: application/json
 Cache-Control: no-cache
@@ -3069,11 +3220,11 @@ Returns a JSON alarm object with the following fields:
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83"
+            "href": "http://192.168.10.4:8070/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83"
         },
         {
             "rel": "state-history",
-            "href": "http://192.168.10.4:8080/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83/state-history"
+            "href": "http://192.168.10.4:8070/v2.0/alarms/f9935bcc-9641-4cbf-8224-0993a947ea83/state-history"
         }
     ],
     "alarm_definition_id": "ad837fca-5564-4cbf-523-0117f7dac6ad",
@@ -3116,7 +3267,7 @@ None.
 #### Request Examples
 ```
 DELETE /v2.0/alarms/b461d659-577b-4d63-9782-a99194d4a472 HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
 ```
@@ -3151,7 +3302,7 @@ None.
 #### Request Data
 ```
 GET /v2.0/alarms/37d1ddf0-d7e3-4fc0-979b-25ac3779d9e0/state-history HTTP/1.1
-Host: 192.168.10.4:8080
+Host: 192.168.10.4:8070
 X-Auth-Token: 2b8882ba2ec44295bf300aecb2caa4f7
 Cache-Control: no-cache
 ```
@@ -3179,11 +3330,11 @@ Returns a JSON object with a 'links' array of links and an 'elements' array of a
     "links": [
         {
             "rel": "self",
-            "href": "http://192.168.10.4:8080/v2.0/alarms/37d1ddf0-d7e3-4fc0-979b-25ac3779d9e0/state-history"
+            "href": "http://192.168.10.4:8070/v2.0/alarms/37d1ddf0-d7e3-4fc0-979b-25ac3779d9e0/state-history"
         },
         {
             "rel": "next",
-            "href": "http://192.168.10.4:8080/v2.0/alarms/37d1ddf0-d7e3-4fc0-979b-25ac3779d9e0/state-history?offset=1424452147006"
+            "href": "http://192.168.10.4:8070/v2.0/alarms/37d1ddf0-d7e3-4fc0-979b-25ac3779d9e0/state-history?offset=1424452147006"
         }
     ],
     "elements": [

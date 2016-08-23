@@ -1,11 +1,11 @@
 /*
- * (C) Copyright 2014-2016 Hewlett Packard Enterprise Development Company LP
- * 
+ * (C) Copyright 2014-2016 Hewlett Packard Enterprise Development LP
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software distributed under the License
  * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
  * or implied. See the License for the specific language governing permissions and limitations under
@@ -24,14 +24,13 @@ import java.util.List;
 
 import monasca.api.app.validation.NotificationMethodValidation;
 import monasca.api.app.validation.Validation;
-import monasca.api.domain.model.notificationmethod.NotificationMethodType;
 
 public class CreateNotificationMethodCommand {
   @NotEmpty
   @Size(min = 1, max = 250)
   public String name;
   @NotNull
-  public NotificationMethodType type;
+  public String type;
   @NotEmpty
   @Size(min = 1, max = 512)
   public String address;
@@ -40,9 +39,9 @@ public class CreateNotificationMethodCommand {
 
   public CreateNotificationMethodCommand() {this.period = "0";}
 
-  public CreateNotificationMethodCommand(String name, NotificationMethodType type, String address, String period) {
+  public CreateNotificationMethodCommand(String name, String notificationMethodType, String address, String period) {
     this.name = name;
-    this.type = type;
+    this.type = notificationMethodType;
     this.address = address;
     period = period == null ? "0" : period;
     this.setPeriod(period);
@@ -72,7 +71,10 @@ public class CreateNotificationMethodCommand {
         return false;
     } else if (!period.equals(other.period))
       return false;
-    if (type != other.type)
+    if (type == null) {
+      if (other.type != null)
+         return false;
+    } else if (!type.equalsIgnoreCase(other.type))
       return false;
     if (convertedPeriod != other.convertedPeriod)
       return false;
@@ -86,6 +88,10 @@ public class CreateNotificationMethodCommand {
   public void setPeriod(String period){
     this.period = period;
     this.convertedPeriod = Validation.parseAndValidateNumber(period, "period");
+  }
+
+  public void setType(String type){
+    this.type = type == null ? null : type.toUpperCase();
   }
 
   public int getConvertedPeriod(){

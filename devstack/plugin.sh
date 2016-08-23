@@ -1,5 +1,5 @@
 #
-# (C) Copyright 2015,2016 Hewlett Packard Enterprise Development Company LP
+# (C) Copyright 2015,2016 Hewlett Packard Enterprise Development LP
 # Copyright 2016 FUJITSU LIMITED
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -111,11 +111,15 @@ function install_monasca {
 
         install_monasca_vertica
 
+    elif [[ "${MONASCA_METRICS_DB,,}" == 'cassandra' ]]; then
+
+        install_monasca_cassandra
+
     else
 
         echo "Found invalid value for variable MONASCA_METRICS_DB: $MONASCA_METRICS_DB"
-        echo "Valid values for MONASCA_METRICS_DB are \"influxdb\" and \"vertica\""
-        die "Please set MONASCA_METRICS_DB to either \"influxdb'' or \"vertica\""
+        echo "Valid values for MONASCA_METRICS_DB are \"influxdb\", \"vertica\" and \"cassandra\""
+        die "Please set MONASCA_METRICS_DB to either \"influxdb\", \"vertica\" or \"cassandra\""
 
     fi
 
@@ -231,6 +235,8 @@ function unstack_monasca {
     sudo service verticad stop || true
 
     sudo service vertica_agent stop || true
+
+    sudo service cassandra stop || true
 }
 
 function clean_monasca {
@@ -317,11 +323,15 @@ function clean_monasca {
 
         clean_monasca_vertica
 
+    elif [[ "${MONASCA_METRICS_DB,,}" == 'cassandra' ]]; then
+
+        clean_monasca_cassandra
+
     else
 
         echo "Found invalid value for variable MONASCA_METRICS_DB: $MONASCA_METRICS_DB"
-        echo "Valid values for MONASCA_METRICS_DB are \"influxdb\" and \"vertica\""
-        die "Please set MONASCA_METRICS_DB to either \"influxdb'' or \"vertica\""
+        echo "Valid values for MONASCA_METRICS_DB are \"influxdb\", \"vertica\" and \"cassandra\""
+        die "Please set MONASCA_METRICS_DB to either \"influxdb\", \"vertica\" or \"cassandra\""
 
     fi
 
@@ -348,12 +358,6 @@ function install_monasca_virtual_env {
     sudo chown $STACK_USER:monasca /opt/monasca
 
     (cd /opt/monasca ; virtualenv .)
-
-    PIP_VIRTUAL_ENV=/opt/monasca
-
-    pip_install --pre --allow-all-external --allow-unverified simport simport
-
-    unset PIP_VIRTUAL_ENV
 }
 
 function clean_monasca_virtual_env {
@@ -414,7 +418,10 @@ function install_kafka {
 
     echo_summary "Install Monasca Kafka"
 
-    sudo curl http://apache.mirrors.tds.net/kafka/${BASE_KAFKA_VERSION}/kafka_${KAFKA_VERSION}.tgz -o /root/kafka_${KAFKA_VERSION}.tgz
+    if [[ "$OFFLINE" != "True" ]]; then
+        sudo curl http://apache.mirrors.tds.net/kafka/${BASE_KAFKA_VERSION}/kafka_${KAFKA_VERSION}.tgz \
+            -o /root/kafka_${KAFKA_VERSION}.tgz
+    fi
 
     sudo groupadd --system kafka || true
 
@@ -501,7 +508,10 @@ function install_monasca_influxdb {
 
     sudo mkdir -p /opt/monasca_download_dir || true
 
-    sudo curl http://s3.amazonaws.com/influxdb/influxdb_${INFLUXDB_VERSION}_amd64.deb -o /opt/monasca_download_dir/influxdb_${INFLUXDB_VERSION}_amd64.deb
+    if [[ "$OFFLINE" != "True" ]]; then
+        sudo curl http://s3.amazonaws.com/influxdb/influxdb_${INFLUXDB_VERSION}_amd64.deb \
+            -o /opt/monasca_download_dir/influxdb_${INFLUXDB_VERSION}_amd64.deb
+    fi
 
     sudo dpkg --skip-same-version -i /opt/monasca_download_dir/influxdb_${INFLUXDB_VERSION}_amd64.deb
 
@@ -535,7 +545,9 @@ function install_monasca_vertica {
     sudo dpkg --skip-same-version -i /vagrant_home/vertica_${VERTICA_VERSION}_amd64.deb
 
     # Download Vertica JDBC driver
+    # if [[ "$OFFLINE" != "True" ]]; then
     # sudo curl https://my.vertica.com/client_drivers/7.2.x/${VERTICA_VERSION}/vertica-jdbc-{VERTICA_VERSION}.jar -o /opt/monasca_download_dir/vertica-jdbc-${VERTICA_VERSION}.jar
+    # fi
 
     sudo /opt/vertica/sbin/install_vertica --hosts "127.0.0.1" --deb /vagrant_home/vertica_${VERTICA_VERSION}_amd64.deb --dba-user-password password --license CE --accept-eula --failure-threshold NONE
 
@@ -552,6 +564,58 @@ function install_monasca_vertica {
     # Copy Vertica JDBC driver to /opt/monasca
     # sudo cp /opt/monasca_download_dir/vertica-jdbc-${VERTICA_VERSION}.jar /opt/monasca/vertica-jdbc-${VERTICA_VERSION}.jar
     sudo cp /vagrant_home/vertica-jdbc-${VERTICA_VERSION}.jar /opt/monasca/vertica-jdbc-${VERTICA_VERSION}.jar
+
+}
+
+function install_monasca_cassandra {
+
+    echo_summary "Install Monasca Cassandra"
+
+    # Recent Cassandra needs Java 8
+    sudo add-apt-repository ppa:openjdk-r/ppa
+    REPOS_UPDATED=False
+    apt_get_update
+    apt_get -y install openjdk-8-jre
+
+    if [[ "$OFFLINE" != "True" ]]; then
+        sudo sh -c "echo 'deb http://www.apache.org/dist/cassandra/debian ${CASSANDRA_VERSION} main' > /etc/apt/sources.list.d/cassandra.list"
+        REPOS_UPDATED=False
+        PUBLIC_KEY=`apt_get_update 2>&1 | awk '/NO_PUBKEY/ {print $21}'`
+        gpg --keyserver pgp.mit.edu --recv-keys ${PUBLIC_KEY}
+        gpg --export --armor ${PUBLIC_KEY} | sudo apt-key --keyring /etc/apt/trusted.gpg.d/cassandra.gpg add -
+    fi
+
+    REPOS_UPDATED=False
+    apt_get_update
+    apt_get -y install cassandra
+
+    if [[ ${SERVICE_HOST} ]]; then
+
+        # set cassandra server listening ip address
+        sudo sed -i "s/^rpc_address: localhost/rpc_address: ${SERVICE_HOST}/g" /etc/cassandra/cassandra.yaml
+
+    fi
+
+    # set batch size larger
+    sudo sed -i "s/^batch_size_warn_threshold_in_kb: 5/batch_size_warn_threshold_in_kb: 50/g" /etc/cassandra/cassandra.yaml
+
+    sudo sed -i "s/^batch_size_fail_threshold_in_kb: 50/batch_size_fail_threshold_in_kb: 500/g" /etc/cassandra/cassandra.yaml
+
+    sudo sh -c "echo 'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64' >> /etc/default/cassandra"
+
+    sudo service cassandra restart
+
+    echo "Sleep for 15 seconds to wait starting up Cassandra"
+    sleep 15s
+
+    if [[ ${SERVICE_HOST} ]]; then
+
+        /usr/bin/cqlsh ${SERVICE_HOST} -f "${MONASCA_BASE}"/monasca-api/devstack/files/cassandra/cassandra_schema.cql
+
+    else
+
+        /usr/bin/cqlsh -f "${MONASCA_BASE}"/monasca-api/devstack/files/cassandra/cassandra_schema.cql
+    fi
 
 }
 
@@ -603,6 +667,27 @@ function clean_monasca_vertica {
     sudo rm -rf /home/dbadmin
 
     sudo apt-get -y purge dialog
+}
+
+function clean_monasca_cassandra {
+
+    echo_summary "Clean Monasca Cassandra"
+
+    sudo rm -f /etc/cassandra/cassandra.yaml
+
+    sudo rm -rf /var/log/cassandra
+
+    sudo rm -rf /etc/cassandra
+
+    apt_get -y purge openjdk-8-jre cassandra
+
+    apt_get -y autoremove
+
+    sudo add-apt-repository -r ppa:openjdk-r/ppa
+
+    sudo rm -f /etc/apt/sources.list.d/cassandra.list
+
+    sudo rm -f /etc/apt/trusted.gpg.d/cassandra.gpg
 }
 
 function install_cli_creds {
@@ -671,13 +756,8 @@ function install_schema {
 
     /opt/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 64 --topic metrics
     /opt/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 12 --topic events
-    /opt/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 12 --topic raw-events
-    /opt/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 12 --topic transformed-events
-    /opt/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 12 --topic stream-definitions
-    /opt/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 12 --topic transform-definitions
     /opt/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 12 --topic alarm-state-transitions
     /opt/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 12 --topic alarm-notifications
-    /opt/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 12 --topic stream-notifications
     /opt/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 3 --topic retry-notifications
     /opt/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 3 --topic 60-seconds-notifications
 
@@ -860,6 +940,7 @@ function install_monasca_api_python {
     pip_install gunicorn
     pip_install PyMySQL
     pip_install influxdb==2.8.0
+    pip_install cassandra-driver>=2.1.4,!=3.6.0
 
     (cd "${MONASCA_BASE}"/monasca-api ; sudo python setup.py sdist)
 
@@ -911,6 +992,16 @@ function install_monasca_api_python {
         sudo sed -i "s/hostname = 127\.0\.0\.1/hostname = ${SERVICE_HOST}/g" /etc/monasca/api-config.conf
         # set keystone ip address
         sudo sed -i "s/identity_uri = http:\/\/127\.0\.0\.1:35357/identity_uri = http:\/\/${SERVICE_HOST}:35357/g" /etc/monasca/api-config.conf
+        # set cassandra ip address
+        sudo sed -i "s/cluster_ip_addresses: 127\.0\.0\.1/cluster_ip_addresses: ${SERVICE_HOST}/g" /etc/monasca/api-config.conf
+
+    fi
+
+    if [[ "${MONASCA_METRICS_DB,,}" == 'cassandra' ]]; then
+
+        # Switch databaseType from influxdb to cassandra
+        sudo sed -i "s/metrics_driver = monasca_api\.common\.repositories\.influxdb/#metrics_driver = monasca_api.common.repositories.influxdb/g" /etc/monasca/api-config.conf
+        sudo sed -i "s/#metrics_driver = monasca_api\.common\.repositories\.cassandra/metrics_driver = monasca_api.common.repositories.cassandra/g" /etc/monasca/api-config.conf
 
     fi
 
@@ -1074,6 +1165,7 @@ function install_monasca_persister_python {
 
     pip_install $MONASCA_PERSISTER_SRC_DIST
     pip_install influxdb==2.8.0
+    pip_install cassandra-driver>=2.1.4,!=3.6.0
 
     unset PIP_VIRTUAL_ENV
 
@@ -1109,6 +1201,18 @@ function install_monasca_persister_python {
         sudo sed -i "s/uri = 127\.0\.0\.1:9092/uri = ${SERVICE_HOST}:9092/g" /etc/monasca/persister.conf
         # set influxdb ip address
         sudo sed -i "s/ip_address = 127\.0\.0\.1/ip_address = ${SERVICE_HOST}/g" /etc/monasca/persister.conf
+        # set cassandra ip address
+        sudo sed -i "s/cluster_ip_addresses: 127\.0\.0\.1/cluster_ip_addresses: ${SERVICE_HOST}/g" /etc/monasca/persister.conf
+
+    fi
+
+    if [[ "${MONASCA_METRICS_DB,,}" == 'cassandra' ]]; then
+
+        # Switch databaseType from influxdb to cassandra
+        sudo sed -i "s/metrics_driver = monasca_persister\.repositories\.influxdb/#metrics_driver = monasca_persister.repositories.influxdb/g" /etc/monasca/persister.conf
+        sudo sed -i "s/#metrics_driver = monasca_persister\.repositories\.cassandra/metrics_driver = monasca_persister.repositories.cassandra/g" /etc/monasca/persister.conf
+        sudo sed -i "s/alarm_state_history_driver = monasca_persister\.repositories\.influxdb/#alarm_state_history_driver = monasca_persister.repositories.influxdb/g" /etc/monasca/persister.conf
+        sudo sed -i "s/#alarm_state_history_driver = monasca_persister\.repositories\.cassandra/alarm_state_history_driver = monasca_persister.repositories.cassandra/g" /etc/monasca/persister.conf
 
     fi
 
@@ -1199,7 +1303,7 @@ function install_monasca_notification {
 
     PIP_VIRTUAL_ENV=/opt/monasca
 
-    pip_install --allow-unverified simport $MONASCA_NOTIFICATION_SRC_DIST
+    pip_install $MONASCA_NOTIFICATION_SRC_DIST
 
     pip_install mysql-python
 
@@ -1281,7 +1385,10 @@ function install_storm {
 
     echo_summary "Install Monasca Storm"
 
-    sudo curl http://apache.mirrors.tds.net/storm/apache-storm-${STORM_VERSION}/apache-storm-${STORM_VERSION}.tar.gz -o /root/apache-storm-${STORM_VERSION}.tar.gz
+    if [[ "$OFFLINE" != "True" ]]; then
+        sudo curl http://apache.mirrors.tds.net/storm/apache-storm-${STORM_VERSION}/apache-storm-${STORM_VERSION}.tar.gz \
+            -o /root/apache-storm-${STORM_VERSION}.tar.gz
+    fi
 
     sudo groupadd --system storm || true
 
@@ -1515,21 +1622,15 @@ function install_monasca_agent {
 
     sudo mkdir -p /opt/monasca-agent/
 
+    (cd /opt/monasca-agent ; sudo virtualenv .)
+
+    (cd /opt/monasca-agent ; sudo ./bin/pip install $MONASCA_AGENT_SRC_DIST)
+
+    (cd /opt/monasca-agent ; sudo ./bin/pip install $MONASCA_CLIENT_SRC_DIST)
+
+    (cd /opt/monasca-agent ; sudo ./bin/pip install kafka-python==0.9.2)
+
     sudo chown $STACK_USER:monasca /opt/monasca-agent
-
-    (cd /opt/monasca-agent ; virtualenv .)
-
-    PIP_VIRTUAL_ENV=/opt/monasca-agent
-
-    pip_install --pre --allow-all-external --allow-unverified simport simport
-
-    (cd /opt/monasca-agent ; sudo -H ./bin/pip install $MONASCA_AGENT_SRC_DIST)
-
-    (cd /opt/monasca-agent ; sudo -H ./bin/pip install $MONASCA_CLIENT_SRC_DIST)
-
-    (cd /opt/monasca-agent ; ./bin/pip install kafka-python==0.9.2)
-
-    unset PIP_VIRTUAL_ENV
 
     sudo mkdir -p /etc/monasca/agent/conf.d || true
 
@@ -1609,7 +1710,10 @@ function install_monasca_smoke_test {
 
     pip_install mySQL-python
 
-    sudo curl -L https://api.github.com/repos/hpcloud-mon/monasca-ci/tarball/master -o /opt/monasca/monasca-ci.tar.gz
+    if [[ "$OFFLINE" != "True" ]]; then
+        sudo curl -L https://api.github.com/repos/hpcloud-mon/monasca-ci/tarball/master \
+            -o /opt/monasca/monasca-ci.tar.gz
+    fi
 
     sudo tar -xzf /opt/monasca/monasca-ci.tar.gz -C /opt/monasca
 
@@ -1719,7 +1823,9 @@ function install_node_nvm {
     echo_summary "Install Node with NVM"
 
     set -i
-    curl https://raw.githubusercontent.com/creationix/nvm/v0.31.1/install.sh | bash
+    if [[ "$OFFLINE" != "True" ]]; then
+        curl https://raw.githubusercontent.com/creationix/nvm/v0.31.1/install.sh | bash
+    fi
     (source "${HOME}"/.nvm/nvm.sh >> /dev/null; nvm install 4.0.0; nvm use 4.0.0)
     set +i
 }

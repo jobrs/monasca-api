@@ -1,6 +1,6 @@
 # Copyright 2014 IBM Corp.
 # Copyright 2016 FUJITSU LIMITED
-# (C) Copyright 2016 Hewlett Packard Enterprise Development Company LP
+# (C) Copyright 2016 Hewlett Packard Enterprise Development LP
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -31,7 +31,8 @@ need to have a bit more re-engineering to get it right.
 """
 global_opts = [cfg.StrOpt('region', help='Region that API is running in'),
                cfg.ListOpt('valid_notification_periods', default=[0, 60],
-                           help='Valid periods for notification methods')]
+                           help='Valid periods for notification methods')
+               ]
 
 cfg.CONF.register_opts(global_opts)
 
@@ -40,6 +41,9 @@ security_opts = [cfg.ListOpt('default_authorized_roles', default=['admin'],
                                   'API'),
                  cfg.ListOpt('agent_authorized_roles', default=['agent'],
                              help='Roles that are only allowed to POST to '
+                                  'the API'),
+                 cfg.ListOpt('read_only_authorized_roles', default=['monasca-read-only-user'],
+                             help='Roles that are only allowed to GET from '
                                   'the API'),
                  cfg.ListOpt('delegate_authorized_roles', default=['admin'],
                              help='Roles that are allowed to POST metrics on '
@@ -77,6 +81,8 @@ repositories_opts = [
     cfg.StrOpt('transforms_driver', default='mysql_transforms_repo',
                help='The repository driver to use for transforms'),
     cfg.StrOpt('notifications_driver', default='mysql_notifications_repo',
+               help='The repository driver to use for notifications'),
+    cfg.StrOpt('notification_method_type_driver', default='mysql_notifications_repo',
                help='The repository driver to use for notifications')]
 
 repositories_group = cfg.OptGroup(name='repositories', title='repositories')
@@ -130,6 +136,12 @@ influxdb_group = cfg.OptGroup(name='influxdb', title='influxdb')
 cfg.CONF.register_group(influxdb_group)
 cfg.CONF.register_opts(influxdb_opts, influxdb_group)
 
+cassandra_opts = [cfg.StrOpt('cluster_ip_addresses'), cfg.StrOpt('keyspace')]
+
+cassandra_group = cfg.OptGroup(name='cassandra', title='cassandra')
+cfg.CONF.register_group(cassandra_group)
+cfg.CONF.register_opts(cassandra_opts, cassandra_group)
+
 mysql_opts = [cfg.StrOpt('database_name'), cfg.StrOpt('hostname'),
               cfg.StrOpt('username'), cfg.StrOpt('password')]
 
@@ -143,6 +155,7 @@ sql_opts = [cfg.StrOpt('url', default=None), cfg.StrOpt('host', default=None),
             cfg.StrOpt('drivername', default=None), cfg.IntOpt('port', default=None),
             cfg.StrOpt('database', default=None), cfg.StrOpt('query', default=None)]
 sql_group = cfg.OptGroup(name='database', title='sql')
+
 
 cfg.CONF.register_group(sql_group)
 cfg.CONF.register_opts(sql_opts, sql_group)
