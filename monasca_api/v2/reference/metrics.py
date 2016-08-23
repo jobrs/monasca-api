@@ -71,14 +71,18 @@ class Metrics(metrics_api_v2.MetricsV2API):
 
     def _validate_metrics(self, metrics):
 
+	current_metric = None
         try:
             if isinstance(metrics, list):
                 for metric in metrics:
+                    current_metric = metric
                     self._validate_single_metric(metric)
             else:
+                current_metric = metrics
                 self._validate_single_metric(metrics)
         except Exception as ex:
             LOG.exception(ex)
+            LOG.error('Invalid metric: {}', current_metric)
             raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
 
     def _validate_single_metric(self, metric):
