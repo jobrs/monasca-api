@@ -22,3 +22,4 @@ kafka-python>=0.9.5,<1.0.0
 simplejson
 monasca-common>=0.0.2
 sqlalchemy
+python-memcached
