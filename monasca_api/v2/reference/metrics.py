@@ -83,7 +83,7 @@ class Metrics(metrics_api_v2.MetricsV2API):
                 self._validate_single_metric(metrics)
         except Exception as ex:
             LOG.exception(ex)
-            LOG.error('Invalid metric: {}', current_metric)
+            LOG.error('Invalid metric: %s', current_metric)
             raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
 
     def _validate_single_metric(self, metric):
