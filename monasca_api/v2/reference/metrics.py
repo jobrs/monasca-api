@@ -13,6 +13,7 @@
 # under the License.
 
 import falcon
+import math
 from monasca_common.simport import simport
 from oslo_config import cfg
 from oslo_log import log
@@ -90,6 +91,7 @@ class Metrics(metrics_api_v2.MetricsV2API):
         validation.metric_name(metric['name'])
         assert isinstance(metric['timestamp'], (int, float)), "Timestamp must be a number"
         assert isinstance(metric['value'], (int, long, float)), "Value must be a number"
+        assert not math.isnan(metric['value']), "Value must not be NaN" 
         if "dimensions" in metric:
             for dimension_key in metric['dimensions']:
                 validation.dimension_key(dimension_key)
