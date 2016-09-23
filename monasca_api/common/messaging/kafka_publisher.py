@@ -11,7 +11,6 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-
 import time
 
 from kafka import client
@@ -22,9 +21,12 @@ from oslo_log import log
 
 from monasca_api.common.messaging import exceptions
 from monasca_api.common.messaging import publisher
+from monasca_api.monitoring import client
+from monasca_api.monitoring.metrics import KAFKA_PRODUCER_ERRORS
 
 LOG = log.getLogger(__name__)
 
+STATSD_CLIENT = client.get_client()
 
 class KafkaPublisher(publisher.Publisher):
     def __init__(self, topic):
@@ -48,6 +50,10 @@ class KafkaPublisher(publisher.Publisher):
 
         self._client = None
         self._producer = None
+
+        self.statsd_kafka_producer_error_count = STATSD_CLIENT.get_counter(KAFKA_PRODUCER_ERRORS,
+                                                                           dimensions={'topic': self.topic})
+
 
     def _init_client(self, wait_time=None):
         for i in range(self.max_retry):
@@ -99,25 +105,30 @@ class KafkaPublisher(publisher.Publisher):
             if not self._producer:
                 self._init_producer()
             self._producer.send_messages(self.topic, message)
+            self.statsd_kafka_producer_error_count.increment(0, sample_rate=0.01)
 
         except (common.KafkaUnavailableError,
                 common.LeaderNotAvailableError):
             self._client = None
             LOG.exception('Error occurred while posting data to Kafka.')
+            self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
             raise exceptions.MessageQueueException()
         except Exception:
             LOG.exception('Unknown error.')
             raise exceptions.MessageQueueException()
+
 
     def send_message_batch(self, messages):
         try:
             if not self._producer:
                 self._init_producer()
             self._producer.send_messages(self.topic, *messages)
+            self.statsd_kafka_producer_error_count.increment(0, sample_rate=0.1)
         except (common.KafkaUnavailableError,
                 common.LeaderNotAvailableError):
             self._client = None
             LOG.exception('Error occurred while posting data to Kafka.')
+            self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
             raise exceptions.MessageQueueException()
         except Exception:
             LOG.exception('Unknown error.')

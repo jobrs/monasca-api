@@ -23,6 +23,9 @@ from monasca_api.common.messaging import (
     exceptions as message_queue_exceptions)
 from monasca_api.common.messaging.message_formats import (
     metrics as metrics_message)
+from monasca_api.monitoring import client
+from monasca_api.monitoring.metrics import METRICS_PUBLISH_TIME, METRICS_LIST_TIME, METRICS_STATS_TIME, \
+    METRICS_RETRIEVE_TIME, METRICS_DIMS_RETRIEVE_TIME
 from monasca_api.v2.common.exceptions import HTTPUnprocessableEntityError
 from monasca_api.v2.common import validation
 from monasca_api.v2.reference import helpers
@@ -30,6 +33,8 @@ from monasca_api.v2.reference import resource
 
 LOG = log.getLogger(__name__)
 
+STATSD_CLIENT = client.get_client()
+STATSD_TIMER = STATSD_CLIENT.get_timer()
 
 def get_merge_metrics_flag(req):
     '''Return the value of the optional metrics_flag
@@ -73,7 +78,7 @@ class Metrics(metrics_api_v2.MetricsV2API):
 
     def _validate_metrics(self, metrics):
 
-	current_metric = None
+        current_metric = None
         try:
             if isinstance(metrics, list):
                 for metric in metrics:
@@ -99,6 +104,7 @@ class Metrics(metrics_api_v2.MetricsV2API):
         if "value_meta" in metric:
                 validation.validate_value_meta(metric['value_meta'])
 
+    @STATSD_TIMER.timed(METRICS_PUBLISH_TIME, sample_rate=0.1)
     def _send_metrics(self, metrics):
         try:
             self._message_queue.send_message_batch(metrics)
@@ -107,6 +113,7 @@ class Metrics(metrics_api_v2.MetricsV2API):
             raise falcon.HTTPServiceUnavailable('Service unavailable',
                                                 ex.message, 60)
 
+    @STATSD_TIMER.timed(METRICS_LIST_TIME, sample_rate=0.1)
     @resource.resource_try_catch_block
     def _list_metrics(self, tenant_id, name, dimensions, req_uri, offset,
                       limit, start_timestamp, end_timestamp):
@@ -197,6 +204,7 @@ class MetricsMeasurements(metrics_api_v2.MetricsMeasurementsV2API):
         res.body = helpers.dumpit_utf8(result)
         res.status = falcon.HTTP_200
 
+    @STATSD_TIMER.timed(METRICS_RETRIEVE_TIME, sample_rate=0.1)
     @resource.resource_try_catch_block
     def _measurement_list(self, tenant_id, name, dimensions, start_timestamp,
                           end_timestamp, req_uri, offset,
@@ -255,6 +263,7 @@ class MetricsStatistics(metrics_api_v2.MetricsStatisticsV2API):
         res.body = helpers.dumpit_utf8(result)
         res.status = falcon.HTTP_200
 
+    @STATSD_TIMER.timed(METRICS_STATS_TIME, sample_rate=0.1)
     @resource.resource_try_catch_block
     def _metric_statistics(self, tenant_id, name, dimensions, start_timestamp,
                            end_timestamp, statistics, period, req_uri,
@@ -342,6 +351,7 @@ class DimensionValues(metrics_api_v2.DimensionValuesV2API):
         res.body = helpers.dumpit_utf8(result)
         res.status = falcon.HTTP_200
 
+    @STATSD_TIMER.timed(METRICS_DIMS_RETRIEVE_TIME, sample_rate=0.1)
     @resource.resource_try_catch_block
     def _dimension_values(self, tenant_id, req_uri, metric_name,
                           dimension_name, offset, limit):

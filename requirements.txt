@@ -23,3 +23,5 @@ simplejson
 monasca-common>=0.0.2
 sqlalchemy
 python-memcached
+
+monascastatsd

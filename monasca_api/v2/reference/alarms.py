@@ -21,6 +21,8 @@ from oslo_log import log
 
 from monasca_api.api import alarms_api_v2
 from monasca_api.common.repositories import exceptions
+from monasca_api.monitoring import client
+from monasca_api.monitoring.metrics import ALARMS_LIST_TIME
 from monasca_api.v2.common.exceptions import HTTPUnprocessableEntityError
 from monasca_api.v2.common.schemas import alarm_update_schema as schema_alarm
 from monasca_api.v2.common import validation
@@ -29,6 +31,9 @@ from monasca_api.v2.reference import helpers
 from monasca_api.v2.reference import resource
 
 LOG = log.getLogger(__name__)
+
+STATSD_CLIENT = client.get_client()
+STATSD_TIMER = STATSD_CLIENT.get_timer()
 
 
 class Alarms(alarms_api_v2.AlarmsV2API,
@@ -322,6 +327,7 @@ class Alarms(alarms_api_v2.AlarmsV2API,
 
         return alarm
 
+    @STATSD_TIMER.timed(ALARMS_LIST_TIME, sample_rate=0.1)
     @resource.resource_try_catch_block
     def _alarm_list(self, req_uri, tenant_id, query_parms, offset, limit):
 
