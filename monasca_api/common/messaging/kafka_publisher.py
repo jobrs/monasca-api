@@ -85,7 +85,7 @@ class KafkaPublisher(publisher.Publisher):
                 self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
             except Exception as e:
                 last_exception = e
-                LOG.error('Kafka at %s initialization failed.' % self.uri)
+                LOG.exception('Kafka at %s initialization failed.' % self.uri)
                 self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
 
             # Wait a bit and try again to get a client
