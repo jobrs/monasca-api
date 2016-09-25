@@ -56,6 +56,7 @@ class KafkaPublisher(publisher.Publisher):
 
 
     def _init_client(self, wait_time=None):
+        last_exception = None
         for i in range(self.max_retry):
             try:
                 # if there is a client instance, but _init_client is called
@@ -73,16 +74,27 @@ class KafkaPublisher(publisher.Publisher):
                 # when a client is re-initialized, existing consumer should be
                 # reset as well.
                 self._producer = None
-                break
-            except common.KafkaUnavailableError:
+                return
+            except common.KafkaUnavailableError as e:
+                last_exception = e
                 LOG.error('Kafka server at %s is down.' % self.uri)
-            except common.LeaderNotAvailableError:
+                self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
+            except common.LeaderNotAvailableError as e:
+                last_exception = e
                 LOG.error('Kafka at %s has no leader available.' % self.uri)
-            except Exception:
+                self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
+            except Exception as e:
+                last_exception = e
                 LOG.error('Kafka at %s initialization failed.' % self.uri)
+                self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
 
             # Wait a bit and try again to get a client
             time.sleep(self.wait_time)
+
+        # do not swallow errors
+        if last_exception:
+            raise last_exception
+
 
     def _init_producer(self):
         try:
@@ -94,6 +106,7 @@ class KafkaPublisher(publisher.Publisher):
         except Exception:
             self._producer = None
             LOG.exception('Kafka (%s) producer can not be created.' % self.uri)
+            self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
 
     def close(self):
         if self._client:
