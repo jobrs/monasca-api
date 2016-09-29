@@ -14,6 +14,8 @@
 
 import falcon
 import math
+import monasca_api.monitoring.client as monitoring_client
+
 from monasca_common.simport import simport
 from oslo_config import cfg
 from oslo_log import log
@@ -23,9 +25,8 @@ from monasca_api.common.messaging import (
     exceptions as message_queue_exceptions)
 from monasca_api.common.messaging.message_formats import (
     metrics as metrics_message)
-from monasca_api.monitoring import client
 from monasca_api.monitoring.metrics import METRICS_PUBLISH_TIME, METRICS_LIST_TIME, METRICS_STATS_TIME, \
-    METRICS_RETRIEVE_TIME, METRICS_DIMS_RETRIEVE_TIME
+    METRICS_RETRIEVE_TIME, METRICS_DIMS_RETRIEVE_TIME, METRICS_REJECTED_COUNT, METRICS_PUBLISH_ERRORS
 from monasca_api.v2.common.exceptions import HTTPUnprocessableEntityError
 from monasca_api.v2.common import validation
 from monasca_api.v2.reference import helpers
@@ -33,8 +34,9 @@ from monasca_api.v2.reference import resource
 
 LOG = log.getLogger(__name__)
 
-STATSD_CLIENT = client.get_client()
+STATSD_CLIENT = monitoring_client.get_client()
 STATSD_TIMER = STATSD_CLIENT.get_timer()
+
 
 def get_merge_metrics_flag(req):
     '''Return the value of the optional metrics_flag
@@ -76,6 +78,9 @@ class Metrics(metrics_api_v2.MetricsV2API):
             raise falcon.HTTPInternalServerError('Service unavailable',
                                                  ex.message)
 
+        self._statsd_rejected_count = STATSD_CLIENT.get_counter(METRICS_REJECTED_COUNT)
+        self._statsd_publish_error_count = STATSD_CLIENT.get_counter(METRICS_PUBLISH_ERRORS)
+
     def _validate_metrics(self, metrics):
 
         current_metric = None
@@ -90,13 +95,16 @@ class Metrics(metrics_api_v2.MetricsV2API):
         except Exception as ex:
             LOG.exception(ex)
             LOG.error('Invalid metric: %s', current_metric)
+            self._statsd_rejected_count.increment(1, sample_rate=1.0)
             raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
+        else:
+            self._statsd_rejected_count.increment(0, sample_rate=0.00001)
 
     def _validate_single_metric(self, metric):
         validation.metric_name(metric['name'])
         assert isinstance(metric['timestamp'], (int, float)), "Timestamp must be a number"
         assert isinstance(metric['value'], (int, long, float)), "Value must be a number"
-        assert not math.isnan(metric['value']), "Value must not be NaN" 
+        assert not math.isnan(metric['value']), "Value must not be NaN"
         if "dimensions" in metric:
             for dimension_key in metric['dimensions']:
                 validation.dimension_key(dimension_key)
@@ -104,14 +112,17 @@ class Metrics(metrics_api_v2.MetricsV2API):
         if "value_meta" in metric:
                 validation.validate_value_meta(metric['value_meta'])
 
-    @STATSD_TIMER.timed(METRICS_PUBLISH_TIME, sample_rate=0.1)
+    @STATSD_TIMER.timed(METRICS_PUBLISH_TIME, sample_rate=0.00001)
     def _send_metrics(self, metrics):
         try:
             self._message_queue.send_message_batch(metrics)
         except message_queue_exceptions.MessageQueueException as ex:
             LOG.exception(ex)
+            self._statsd_publish_error_count.increment(1, sample_rate=1.0)
             raise falcon.HTTPServiceUnavailable('Service unavailable',
                                                 ex.message, 60)
+        else:
+            self._statsd_publish_error_count.increment(0, sample_rate=0.00001)
 
     @STATSD_TIMER.timed(METRICS_LIST_TIME, sample_rate=0.1)
     @resource.resource_try_catch_block
@@ -204,7 +215,7 @@ class MetricsMeasurements(metrics_api_v2.MetricsMeasurementsV2API):
         res.body = helpers.dumpit_utf8(result)
         res.status = falcon.HTTP_200
 
-    @STATSD_TIMER.timed(METRICS_RETRIEVE_TIME, sample_rate=0.1)
+    @STATSD_TIMER.timed(METRICS_RETRIEVE_TIME, sample_rate=0.001)
     @resource.resource_try_catch_block
     def _measurement_list(self, tenant_id, name, dimensions, start_timestamp,
                           end_timestamp, req_uri, offset,

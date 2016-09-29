@@ -20,8 +20,14 @@ from sqlalchemy.engine.url import URL, make_url
 from sqlalchemy import MetaData
 
 from monasca_api.common.repositories import exceptions
+from monasca_api.monitoring import client
+from monasca_api.monitoring.metrics import CONFIGDB_ERRORS, CONFIGDB_TIME
 
 LOG = log.getLogger(__name__)
+
+STATSD_CLIENT = client.get_client()
+STATSD_TIMER = STATSD_CLIENT.get_timer()
+_statsd_configdb_error_count = STATSD_CLIENT.get_counter(CONFIGDB_ERRORS)
 
 
 class SQLRepository(object):
@@ -60,11 +66,15 @@ class SQLRepository(object):
 
 
 def sql_try_catch_block(fun):
+    @STATSD_TIMER.timed(CONFIGDB_TIME, sample_rate=0.001)
     def try_it(*args, **kwargs):
+        global _statsd_configdb_error_count
 
         try:
 
-            return fun(*args, **kwargs)
+            result = fun(*args, **kwargs)
+            _statsd_configdb_error_count.increment(0, sample_rate=0.001)
+            return result
 
         except exceptions.DoesNotExistException:
             raise
@@ -74,7 +84,9 @@ def sql_try_catch_block(fun):
             raise
         except Exception as ex:
             LOG.exception(ex)
+            _statsd_configdb_error_count.increment(1, sample_rate=1)
             raise
+
         # exceptions.RepositoryException(ex)
 
     return try_it

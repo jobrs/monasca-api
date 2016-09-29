@@ -21,12 +21,12 @@ from oslo_log import log
 
 from monasca_api.common.messaging import exceptions
 from monasca_api.common.messaging import publisher
-from monasca_api import monitoring
+from monasca_api.monitoring import client as monitoring_client
 from monasca_api.monitoring.metrics import KAFKA_PRODUCER_ERRORS
 
 LOG = log.getLogger(__name__)
 
-STATSD_CLIENT = monitoring.client.get_client()
+STATSD_CLIENT = monitoring_client.get_client()
 
 class KafkaPublisher(publisher.Publisher):
     def __init__(self, topic):

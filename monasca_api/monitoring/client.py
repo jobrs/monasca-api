@@ -56,6 +56,7 @@ cfg.CONF.register_opts(monitoring_opts, monitoring_group)
 
 
 def get_client(dimensions=None):
+    # type: (object) -> object
     """Creates statsd client
 
     Creates monasca-statsd client using configuration from
