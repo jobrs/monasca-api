@@ -26,7 +26,7 @@ from monasca_api.common.messaging import (
 from monasca_api.common.messaging.message_formats import (
     metrics as metrics_message)
 from monasca_api.monitoring.metrics import METRICS_PUBLISH_TIME, METRICS_LIST_TIME, METRICS_STATS_TIME, \
-    METRICS_RETRIEVE_TIME, METRICS_DIMS_RETRIEVE_TIME, METRICS_REJECTED_COUNT, METRICS_PUBLISH_ERRORS
+    METRICS_RETRIEVE_TIME, METRICS_DIMS_RETRIEVE_TIME, METRICS_REJECTED_COUNT
 from monasca_api.v2.common.exceptions import HTTPUnprocessableEntityError
 from monasca_api.v2.common import validation
 from monasca_api.v2.reference import helpers
