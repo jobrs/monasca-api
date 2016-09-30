@@ -79,7 +79,6 @@ class Metrics(metrics_api_v2.MetricsV2API):
                                                  ex.message)
 
         self._statsd_rejected_count = STATSD_CLIENT.get_counter(METRICS_REJECTED_COUNT)
-        self._statsd_publish_error_count = STATSD_CLIENT.get_counter(METRICS_PUBLISH_ERRORS)
 
     def _validate_metrics(self, metrics):
 
@@ -112,19 +111,14 @@ class Metrics(metrics_api_v2.MetricsV2API):
         if "value_meta" in metric:
                 validation.validate_value_meta(metric['value_meta'])
 
-    @STATSD_TIMER.timed(METRICS_PUBLISH_TIME, sample_rate=0.00001)
     def _send_metrics(self, metrics):
         try:
             self._message_queue.send_message_batch(metrics)
         except message_queue_exceptions.MessageQueueException as ex:
             LOG.exception(ex)
-            self._statsd_publish_error_count.increment(1, sample_rate=1.0)
             raise falcon.HTTPServiceUnavailable('Service unavailable',
                                                 ex.message, 60)
-        else:
-            self._statsd_publish_error_count.increment(0, sample_rate=0.00001)
 
-    @STATSD_TIMER.timed(METRICS_LIST_TIME, sample_rate=0.1)
     @resource.resource_try_catch_block
     def _list_metrics(self, tenant_id, name, dimensions, req_uri, offset,
                       limit, start_timestamp, end_timestamp):
@@ -139,6 +133,7 @@ class Metrics(metrics_api_v2.MetricsV2API):
 
         return helpers.paginate(result, req_uri, limit)
 
+    @STATSD_TIMER.timed(METRICS_PUBLISH_TIME, sample_rate=0.01)
     def on_post(self, req, res):
         helpers.validate_json_content_type(req)
         helpers.validate_authorization(req,
@@ -153,6 +148,7 @@ class Metrics(metrics_api_v2.MetricsV2API):
         self._send_metrics(transformed_metrics)
         res.status = falcon.HTTP_204
 
+    @STATSD_TIMER.timed(METRICS_LIST_TIME, sample_rate=0.1)
     def on_get(self, req, res):
         helpers.validate_authorization(req, self._get_metrics_authorized_roles)
         tenant_id = helpers.get_tenant_id(req)
@@ -193,6 +189,7 @@ class MetricsMeasurements(metrics_api_v2.MetricsMeasurementsV2API):
             raise falcon.HTTPInternalServerError('Service unavailable',
                                                  ex.message)
 
+    @STATSD_TIMER.timed(METRICS_RETRIEVE_TIME, sample_rate=0.01)
     def on_get(self, req, res):
         helpers.validate_authorization(req, self._get_metrics_authorized_roles)
         tenant_id = helpers.get_tenant_id(req)
@@ -215,7 +212,6 @@ class MetricsMeasurements(metrics_api_v2.MetricsMeasurementsV2API):
         res.body = helpers.dumpit_utf8(result)
         res.status = falcon.HTTP_200
 
-    @STATSD_TIMER.timed(METRICS_RETRIEVE_TIME, sample_rate=0.001)
     @resource.resource_try_catch_block
     def _measurement_list(self, tenant_id, name, dimensions, start_timestamp,
                           end_timestamp, req_uri, offset,
@@ -250,6 +246,7 @@ class MetricsStatistics(metrics_api_v2.MetricsStatisticsV2API):
             raise falcon.HTTPInternalServerError('Service unavailable',
                                                  ex.message)
 
+    @STATSD_TIMER.timed(METRICS_STATS_TIME, sample_rate=0.01)
     def on_get(self, req, res):
         helpers.validate_authorization(req, self._get_metrics_authorized_roles)
         tenant_id = helpers.get_tenant_id(req)
@@ -274,7 +271,6 @@ class MetricsStatistics(metrics_api_v2.MetricsStatisticsV2API):
         res.body = helpers.dumpit_utf8(result)
         res.status = falcon.HTTP_200
 
-    @STATSD_TIMER.timed(METRICS_STATS_TIME, sample_rate=0.1)
     @resource.resource_try_catch_block
     def _metric_statistics(self, tenant_id, name, dimensions, start_timestamp,
                            end_timestamp, statistics, period, req_uri,
@@ -350,6 +346,7 @@ class DimensionValues(metrics_api_v2.DimensionValuesV2API):
             raise falcon.HTTPInternalServerError('Service unavailable',
                                                  ex.message)
 
+    @STATSD_TIMER.timed(METRICS_DIMS_RETRIEVE_TIME, sample_rate=0.1)
     def on_get(self, req, res):
         helpers.validate_authorization(req, self._get_metrics_authorized_roles)
         tenant_id = helpers.get_tenant_id(req)
@@ -362,7 +359,6 @@ class DimensionValues(metrics_api_v2.DimensionValuesV2API):
         res.body = helpers.dumpit_utf8(result)
         res.status = falcon.HTTP_200
 
-    @STATSD_TIMER.timed(METRICS_DIMS_RETRIEVE_TIME, sample_rate=0.1)
     @resource.resource_try_catch_block
     def _dimension_values(self, tenant_id, req_uri, metric_name,
                           dimension_name, offset, limit):

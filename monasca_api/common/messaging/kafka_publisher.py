@@ -128,6 +128,7 @@ class KafkaPublisher(publisher.Publisher):
             raise exceptions.MessageQueueException()
         except Exception:
             LOG.exception('Unknown error.')
+            self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
             raise exceptions.MessageQueueException()
 
 
@@ -145,4 +146,5 @@ class KafkaPublisher(publisher.Publisher):
             raise exceptions.MessageQueueException()
         except Exception:
             LOG.exception('Unknown error.')
+            self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
             raise exceptions.MessageQueueException()
