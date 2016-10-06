@@ -98,7 +98,6 @@ class Metrics(metrics_api_v2.MetricsV2API):
             LOG.error('Invalid metric: %s', current_metric)
             self._statsd_rejected_count.increment(1, sample_rate=1.0)
             raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
-        else:
 
     def _validate_single_metric(self, metric):
         validation.metric_name(metric['name'])
