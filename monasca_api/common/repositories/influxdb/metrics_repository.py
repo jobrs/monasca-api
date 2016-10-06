@@ -688,11 +688,11 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
             LOG.exception(ex)
             raise exceptions.RepositoryException(ex)
 
-    @STATSD_TIMER.timed(INFLUXDB_QUERY_TIME, sample_rate=0.001)
+    @STATSD_TIMER.timed(INFLUXDB_QUERY_TIME, sample_rate=0.01)
     def _query_influxdb(self, query):
         try:
             result = self.influxdb_client.query(query)
-            self._statsd_tsdb_error_count.increment(0, sample_rate=0.001)
+            self._statsd_tsdb_error_count.increment(0, sample_rate=0.01)
             return result
         except Exception as ex:
             self._statsd_tsdb_error_count.increment(1, sample_rate=1.0)

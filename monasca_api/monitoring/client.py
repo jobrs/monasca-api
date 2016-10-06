@@ -73,7 +73,7 @@ def get_client(dimensions=None):
 
         {
             'service': 'monitoring',
-            'component': 'monasca-log-api'
+            'component': 'monasca-api'
         }
 
     Note:

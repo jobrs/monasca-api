@@ -118,7 +118,7 @@ class KafkaPublisher(publisher.Publisher):
             if not self._producer:
                 self._init_producer()
             self._producer.send_messages(self.topic, message)
-            self.statsd_kafka_producer_error_count.increment(0, sample_rate=0.01)
+            self.statsd_kafka_producer_error_count.increment(0, sample_rate=0.001)
 
         except (common.KafkaUnavailableError,
                 common.LeaderNotAvailableError):
@@ -137,7 +137,7 @@ class KafkaPublisher(publisher.Publisher):
             if not self._producer:
                 self._init_producer()
             self._producer.send_messages(self.topic, *messages)
-            self.statsd_kafka_producer_error_count.increment(0, sample_rate=0.1)
+            self.statsd_kafka_producer_error_count.increment(0, sample_rate=0.01)
         except (common.KafkaUnavailableError,
                 common.LeaderNotAvailableError):
             self._client = None

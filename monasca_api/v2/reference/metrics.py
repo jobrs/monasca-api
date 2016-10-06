@@ -91,13 +91,14 @@ class Metrics(metrics_api_v2.MetricsV2API):
             else:
                 current_metric = metrics
                 self._validate_single_metric(metrics)
+
+            self._statsd_rejected_count.increment(0, sample_rate=0.0001)
         except Exception as ex:
             LOG.exception(ex)
             LOG.error('Invalid metric: %s', current_metric)
             self._statsd_rejected_count.increment(1, sample_rate=1.0)
             raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
         else:
-            self._statsd_rejected_count.increment(0, sample_rate=0.00001)
 
     def _validate_single_metric(self, metric):
         validation.metric_name(metric['name'])
@@ -133,7 +134,7 @@ class Metrics(metrics_api_v2.MetricsV2API):
 
         return helpers.paginate(result, req_uri, limit)
 
-    @STATSD_TIMER.timed(METRICS_PUBLISH_TIME, sample_rate=0.01)
+    @STATSD_TIMER.timed(METRICS_PUBLISH_TIME, sample_rate=0.001)
     def on_post(self, req, res):
         helpers.validate_json_content_type(req)
         helpers.validate_authorization(req,
@@ -189,7 +190,7 @@ class MetricsMeasurements(metrics_api_v2.MetricsMeasurementsV2API):
             raise falcon.HTTPInternalServerError('Service unavailable',
                                                  ex.message)
 
-    @STATSD_TIMER.timed(METRICS_RETRIEVE_TIME, sample_rate=0.01)
+    @STATSD_TIMER.timed(METRICS_RETRIEVE_TIME, sample_rate=0.1)
     def on_get(self, req, res):
         helpers.validate_authorization(req, self._get_metrics_authorized_roles)
         tenant_id = helpers.get_tenant_id(req)
@@ -246,7 +247,7 @@ class MetricsStatistics(metrics_api_v2.MetricsStatisticsV2API):
             raise falcon.HTTPInternalServerError('Service unavailable',
                                                  ex.message)
 
-    @STATSD_TIMER.timed(METRICS_STATS_TIME, sample_rate=0.01)
+    @STATSD_TIMER.timed(METRICS_STATS_TIME, sample_rate=0.1)
     def on_get(self, req, res):
         helpers.validate_authorization(req, self._get_metrics_authorized_roles)
         tenant_id = helpers.get_tenant_id(req)

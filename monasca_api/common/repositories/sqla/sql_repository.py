@@ -66,14 +66,14 @@ class SQLRepository(object):
 
 
 def sql_try_catch_block(fun):
-    @STATSD_TIMER.timed(CONFIGDB_TIME, sample_rate=0.001)
+    @STATSD_TIMER.timed(CONFIGDB_TIME, sample_rate=1)
     def try_it(*args, **kwargs):
         global _statsd_configdb_error_count
 
         try:
 
             result = fun(*args, **kwargs)
-            _statsd_configdb_error_count.increment(0, sample_rate=0.001)
+            _statsd_configdb_error_count.increment(0, sample_rate=1)
             return result
 
         except exceptions.DoesNotExistException:
