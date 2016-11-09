@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014 Hewlett-Packard
-# (C) Copyright 2015,2016 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2014-2016 Hewlett Packard Enterprise Development LP
 # Copyright 2015 Cray Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -16,7 +15,6 @@
 # under the License.
 from datetime import datetime
 from datetime import timedelta
-import hashlib
 import json
 import monasca_api.monitoring.client as monitoring_client
 
@@ -77,25 +75,34 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
 
     def _build_select_measurement_query(self, dimensions, name, tenant_id,
                                         region, start_timestamp, end_timestamp,
-                                        offset, limit):
+                                        offset, group_by, limit):
 
         from_clause = self._build_from_clause(dimensions, name, tenant_id,
                                               region, start_timestamp,
                                               end_timestamp)
 
-        offset_clause = self._build_offset_clause(offset, limit)
+        offset_clause = self._build_offset_clause(offset)
 
-        query = 'select value, value_meta ' + from_clause + offset_clause
+        group_by_clause = self._build_group_by_clause(group_by)
+
+        limit_clause = self._build_limit_clause(limit)
+
+        query = 'select value, value_meta '\
+                + from_clause + offset_clause\
+                + group_by_clause + limit_clause
 
         return query
 
     def _build_statistics_query(self, dimensions, name, tenant_id,
                                 region, start_timestamp, end_timestamp,
-                                statistics, period, offset, limit):
+                                statistics, period, offset, group_by, limit):
 
         from_clause = self._build_from_clause(dimensions, name, tenant_id,
                                               region, start_timestamp,
                                               end_timestamp)
+        if period is None:
+            period = str(300)
+
         if offset:
             if '_' in offset:
                 tmp = datetime.strptime(str(offset).split('_')[1], "%Y-%m-%dT%H:%M:%SZ")
@@ -117,12 +124,9 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
 
         query = 'select ' + statistic_string + ' ' + from_clause
 
-        if period is None:
-            period = str(300)
+        query += self._build_group_by_clause(group_by, period)
 
-        query += " group by time(" + period + "s)"
-
-        limit_clause = " limit {}".format(str(limit + 1))
+        limit_clause = self._build_limit_clause(limit)
 
         query += limit_clause
 
@@ -222,28 +226,11 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
             LOG.exception(ex)
             raise exceptions.RepositoryException(ex)
 
-    def _generate_dimension_values_id(self, metric_name, dimension_name):
-        sha1 = hashlib.sha1()
-        hashstr = "metricName=" + (metric_name or "") + "dimensionName=" + dimension_name
-        sha1.update(hashstr)
-        return sha1.hexdigest()
-
-    def _build_serie_dimension_values(self, series_names, metric_name, dimension_name,
-                                      tenant_id, region, offset):
-        dim_vals = []
-        sha1_id = self._generate_dimension_values_id(metric_name, dimension_name)
-        json_dim_vals = {u'id': sha1_id,
-                         u'dimension_name': dimension_name,
-                         u'values': dim_vals}
-
-        #
-        # Only return metric name if one was provided
-        #
-        if metric_name:
-            json_dim_vals[u'metric_name'] = metric_name
-
+    def _build_serie_dimension_values(self, series_names, dimension_name):
+        dim_values = []
+        json_dim_value_list = []
         if not series_names:
-            return json_dim_vals
+            return json_dim_value_list
 
         if 'series' in series_names.raw:
             for series in series_names.raw['series']:
@@ -255,12 +242,29 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
                         if value and not name.startswith(u'_')
                         }
 
-                    if dimension_name in dims and dims[dimension_name] not in dim_vals:
-                        dim_vals.append(dims[dimension_name])
+                    if dimension_name in dims and dims[dimension_name] not in\
+                            dim_values:
+                        dim_values.append(dims[dimension_name])
+                        json_dim_value_list.append({u'dimension_value':
+                                                   dims[dimension_name]})
 
-        dim_vals = sorted(dim_vals)
-        json_dim_vals[u'values'] = dim_vals
-        return json_dim_vals
+        json_dim_value_list = sorted(json_dim_value_list)
+        return json_dim_value_list
+
+    def _build_serie_dimension_names(self, series_names):
+        dim_names = []
+        json_dim_name_list = []
+        if not series_names:
+            return json_dim_name_list
+
+        if 'series' in series_names.raw:
+            for series in series_names.raw['series']:
+                for name in series[u'columns']:
+                    if name not in dim_names and not name.startswith(u'_'):
+                        dim_names.append(name)
+                        json_dim_name_list.append({u'dimension_name': name})
+        json_dim_name_list = sorted(json_dim_name_list)
+        return json_dim_name_list
 
     def _build_serie_metric_list(self, series_names, tenant_id, region,
                                  start_timestamp, end_timestamp,
@@ -302,47 +306,24 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
 
         return json_metric_list
 
-    def _build_serie_name_list(self, series_names):
-
-        json_metric_list = []
-
-        if not series_names:
-            return json_metric_list
-
-        if 'series' in series_names.raw:
-
-            id = 0
-
-            for series in series_names.raw['series']:
-                id += 1
-
-                name = {u'id': str(id),
-                        u'name': series[u'name']}
-
-                json_metric_list.append(name)
-
-        return json_metric_list
-
     def _build_measurement_name_list(self, measurement_names):
+        """read measurement names from InfluxDB response
 
-        """
         Extract the measurement names (InfluxDB terminology) from the SHOW MEASURMENTS result to yield metric names
         :param measurement_names: result from SHOW MEASUREMENTS call (json-dict)
         :return: list of metric-names (Monasca terminology)
         """
+
         json_metric_list = []
 
         if not measurement_names:
             return json_metric_list
 
-        seqno = 0
-
         for name in measurement_names.raw.get(u'series', [{}])[0].get(u'values', []):
-            seqno += 1
-
-            entry = {u'id': str(seqno), u'name': name[0]}
+            entry = {u'name': name[0]}
             json_metric_list.append(entry)
 
+        json_metric_list = sorted(json_metric_list)
         return json_metric_list
 
     def _get_dimensions(self, tenant_id, region, name, dimensions):
@@ -359,7 +340,7 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
 
     def measurement_list(self, tenant_id, region, name, dimensions,
                          start_timestamp, end_timestamp, offset,
-                         limit, merge_metrics_flag):
+                         limit, merge_metrics_flag, group_by):
 
         json_measurement_list = []
 
@@ -369,9 +350,10 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
                                                          region,
                                                          start_timestamp,
                                                          end_timestamp,
-                                                         offset, limit)
+                                                         offset, group_by,
+                                                         limit)
 
-            if not merge_metrics_flag:
+            if not group_by and not merge_metrics_flag:
                 dimensions = self._get_dimensions(tenant_id, region, name, dimensions)
                 query += " slimit 1"
 
@@ -379,6 +361,12 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
 
             if not result:
                 return json_measurement_list
+
+            offset_id = 0
+            if offset is not None:
+                offset_tuple = offset.split('_')
+                offset_id = int(offset_tuple[0]) if len(offset_tuple) > 1 else 0
+            index = offset_id
 
             for serie in result.raw['series']:
 
@@ -394,13 +382,19 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
                                                   value_meta])
 
                     measurement = {u'name': serie['name'],
-                                   u'id': measurements_list[-1][0],
-                                   u'dimensions': dimensions,
+                                   u'id': str(index),
                                    u'columns': [u'timestamp', u'value',
                                                 u'value_meta'],
                                    u'measurements': measurements_list}
 
+                    if not group_by:
+                        measurement[u'dimensions'] = dimensions
+                    else:
+                        measurement[u'dimensions'] = {key: value for key, value in serie['tags'].iteritems()
+                                                      if not key.startswith('_')}
+
                     json_measurement_list.append(measurement)
+                    index += 1
 
             return json_measurement_list
 
@@ -435,22 +429,16 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
 
             raise exceptions.RepositoryException(ex)
 
-    def list_metric_names(self, tenant_id, region, dimensions, offset, limit):
+    def list_metric_names(self, tenant_id, region, dimensions):
 
         try:
 
             query = self._build_show_measurements_query(dimensions, None, tenant_id,
                                                         region)
 
-            query += " limit {}".format(limit + 1)
-
-            if offset:
-                query += ' offset {}'.format(int(offset) + 1)
-
             result = self._query_influxdb(query)
 
             json_name_list = self._build_measurement_name_list(result)
-
             return json_name_list
 
         except Exception as ex:
@@ -458,20 +446,19 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
             raise exceptions.RepositoryException(ex)
 
     def metrics_statistics(self, tenant_id, region, name, dimensions,
-                           start_timestamp,
-                           end_timestamp, statistics, period, offset, limit,
-                           merge_metrics_flag):
+                           start_timestamp, end_timestamp, statistics,
+                           period, offset, limit, merge_metrics_flag,
+                           group_by):
 
         json_statistics_list = []
 
         try:
             query = self._build_statistics_query(dimensions, name, tenant_id,
-                                                 region,
-                                                 start_timestamp,
+                                                 region, start_timestamp,
                                                  end_timestamp, statistics,
-                                                 period, offset, limit)
+                                                 period, offset, group_by, limit)
 
-            if not merge_metrics_flag:
+            if not group_by and not merge_metrics_flag:
                 dimensions = self._get_dimensions(tenant_id, region, name, dimensions)
                 query += " slimit 1"
 
@@ -479,6 +466,12 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
 
             if not result:
                 return json_statistics_list
+
+            offset_id = 0
+            if offset is not None:
+                offset_tuple = offset.split('_')
+                offset_id = int(offset_tuple[0]) if len(offset_tuple) > 1 else 0
+            index = offset_id
 
             for serie in result.raw['series']:
 
@@ -492,16 +485,23 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
                         timestamp = stats[0]
                         if '.' in timestamp:
                             stats[0] = str(timestamp)[:19] + 'Z'
-                        stats[1] = stats[1] or 0
-                        stats_list.append(stats)
+                        for stat in stats[1:]:
+                            if stat is not None:
+                                stats_list.append(stats)
 
                     statistic = {u'name': serie['name'],
-                                 u'id': stats_list[-1][0],
-                                 u'dimensions': dimensions,
+                                 u'id': str(index),
                                  u'columns': columns,
                                  u'statistics': stats_list}
 
+                    if not group_by:
+                        statistic[u'dimensions'] = dimensions
+                    else:
+                        statistic[u'dimensions'] = {key: value for key, value in serie['tags'].iteritems()
+                                                    if not key.startswith('_')}
+
                     json_statistics_list.append(statistic)
+                    index += 1
 
             return json_statistics_list
 
@@ -536,17 +536,32 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
 
             raise exceptions.RepositoryException(ex)
 
-    def _build_offset_clause(self, offset, limit):
+    def _build_offset_clause(self, offset):
 
         if offset:
-
-            offset_clause = (
-                " and time > '{}' limit {}".format(offset, str(limit + 1)))
+            offset_clause = " and time > '{}'".format(offset)
         else:
-
-            offset_clause = " limit {}".format(str(limit + 1))
+            offset_clause = ""
 
         return offset_clause
+
+    def _build_group_by_clause(self, group_by, period=None):
+        if group_by is not None and not isinstance(group_by, list):
+            group_by = str(group_by).split(',')
+        if group_by or period:
+            items = []
+            if group_by:
+                items.extend(group_by)
+            if period:
+                items.append("time(" + str(period) + "s)")
+            clause = " group by " + ','.join(items)
+        else:
+            clause = ""
+
+        return clause
+
+    def _build_limit_clause(self, limit):
+        return " limit {} ".format(str(limit + 1))
 
     def _has_measurements(self, tenant_id, region, name, dimensions,
                           start_timestamp, end_timestamp):
@@ -570,9 +585,10 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
                                              dimensions,
                                              start_timestamp,
                                              end_timestamp,
-                                             0,
+                                             None,
                                              1,
-                                             False)
+                                             False,
+                                             None)
 
         if len(measurements) == 0:
             has_measurements = False
@@ -622,9 +638,11 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
                 time_clause += " and time <= " + str(int(end_timestamp *
                                                          1000000)) + "u "
 
-            offset_clause = self._build_offset_clause(offset, limit)
+            offset_clause = self._build_offset_clause(offset)
 
-            query += where_clause + time_clause + offset_clause
+            limit_clause = self._build_limit_clause(limit)
+
+            query += where_clause + time_clause + offset_clause + limit_clause
 
             result = self._query_influxdb(query)
 
@@ -669,21 +687,25 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
         return int((dt - datetime(1970, 1, 1)).total_seconds() * 1000)
 
     def list_dimension_values(self, tenant_id, region, metric_name,
-                              dimension_name, offset, limit):
-
+                              dimension_name):
         try:
-            query = self._build_show_series_query(None, metric_name, tenant_id, region)
+            query = self._build_show_series_query(None, metric_name,
+                                                  tenant_id, region)
             result = self._query_influxdb(query)
+            json_dim_name_list = self._build_serie_dimension_values(
+                result, dimension_name)
+            return json_dim_name_list
+        except Exception as ex:
+            LOG.exception(ex)
+            raise exceptions.RepositoryException(ex)
 
-            json_dim_vals = self._build_serie_dimension_values(result,
-                                                               metric_name,
-                                                               dimension_name,
-                                                               tenant_id,
-                                                               region,
-                                                               offset)
-
-            return json_dim_vals
-
+    def list_dimension_names(self, tenant_id, region, metric_name):
+        try:
+            query = self._build_show_series_query(None, metric_name,
+                                                  tenant_id, region)
+            result = self.influxdb_client.query(query)
+            json_dim_name_list = self._build_serie_dimension_names(result)
+            return json_dim_name_list
         except Exception as ex:
             LOG.exception(ex)
             raise exceptions.RepositoryException(ex)

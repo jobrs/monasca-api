@@ -1,4 +1,5 @@
 # Copyright 2015 Cray Inc. All Rights Reserved.
+# (C) Copyright 2016 Hewlett Packard Enterprise Development LP
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -62,10 +63,11 @@ class TestRepoMetricsInfluxDB(unittest.TestCase):
             end_timestamp=2,
             offset=None,
             limit=1,
-            merge_metrics_flag=True)
+            merge_metrics_flag=True,
+            group_by=None)
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]['dimensions'], None)
+        self.assertIsNone(result[0]['dimensions'])
         self.assertEqual(result[0]['name'], 'dummy.series')
         self.assertEqual(result[0]['columns'],
                          ['timestamp', 'value', 'value_meta'])
@@ -152,18 +154,40 @@ class TestRepoMetricsInfluxDB(unittest.TestCase):
             "38dc2a2549f94d2e9a4fa1cc45a4970c",
             "useast",
             "custom_metric",
-            "hostname",
-            offset=None,
-            limit=1)
+            "hostname")
 
-        self.assertEqual(result, {
-            u'dimension_name': 'hostname',
-            u'values': [
-                u'custom_host'
-            ],
-            u'id': 'bea9565d854a16a3366164de213694c190f27675',
-            u'metric_name': 'custom_metric'
-        })
+        self.assertEqual(result, [{u'dimension_value': u'custom_host'}])
+
+    @patch("monasca_api.common.repositories.influxdb.metrics_repository.client.InfluxDBClient")
+    def test_list_dimension_names(self, influxdb_client_mock):
+        mock_client = influxdb_client_mock.return_value
+        mock_client.query.return_value.raw = {
+            u'series': [{
+                u'values': [[
+                    u'custom_metric,_region=useast,_tenant_id=38dc2a2549f94d2e9a4fa1cc45a4970c,'
+                    u'hostname=custom_host,service=custom_service',
+                    u'useast',
+                    u'38dc2a2549f94d2e9a4fa1cc45a4970c',
+                    u'custom_host',
+                    u'custom_service'
+                ]],
+                u'name': u'custom_metric',
+                u'columns': [u'_key', u'_region', u'_tenant_id', u'hostname', u'service']
+            }]
+        }
+
+        repo = influxdb_repo.MetricsRepository()
+
+        result = repo.list_dimension_names(
+            "38dc2a2549f94d2e9a4fa1cc45a4970c",
+            "useast",
+            "custom_metric")
+
+        self.assertEqual(result,
+                         [
+                             {u'dimension_name': u'hostname'},
+                             {u'dimension_name': u'service'}
+                         ])
 
 
 class TestRepoMetricsCassandra(testtools.TestCase):
@@ -218,10 +242,12 @@ class TestRepoMetricsCassandra(testtools.TestCase):
 
     @patch("monasca_api.common.repositories.cassandra.metrics_repository.Cluster.connect")
     def test_list_metric_names(self, cassandra_connect_mock):
+
+        Metric_map = namedtuple('Metric_map', 'metric_map')
+
         cassandra_session_mock = cassandra_connect_mock.return_value
         cassandra_session_mock.execute.return_value = [
-            [
-                binascii.unhexlify(b"01d39f19798ed27bbf458300bf843edd17654614"),
+            Metric_map(
                 {
                     "__name__": "disk.space_used_perc",
                     "device": "rootfs",
@@ -229,15 +255,14 @@ class TestRepoMetricsCassandra(testtools.TestCase):
                     "hosttype": "native",
                     "mount_point": "/",
                 }
-            ],
-            [
-                binascii.unhexlify(b"042da8f7445d779f4bb7214aaf744e512d897ac7"),
+            ),
+            Metric_map(
                 {
                     "__name__": "cpu.idle_perc",
                     "hostname": "host0",
                     "service": "monitoring"
                 }
-            ]
+            )
         ]
 
         repo = cassandra_repo.MetricsRepository()
@@ -248,18 +273,14 @@ class TestRepoMetricsCassandra(testtools.TestCase):
                 "hostname": "host0",
                 "hosttype": "native",
                 "mount_point": "/",
-                "device": "rootfs"},
-            offset=None,
-            limit=1)
+                "device": "rootfs"})
 
         self.assertEqual([
             {
-                u'name': u'disk.space_used_perc',
-                u'id': u'01d39f19798ed27bbf458300bf843edd17654614'
+                u'name': u'cpu.idle_perc'
             },
             {
-                u'name': u'cpu.idle_perc',
-                u'id': u'042da8f7445d779f4bb7214aaf744e512d897ac7'
+                u'name': u'disk.space_used_perc'
             }
         ], result)
 
@@ -305,7 +326,7 @@ class TestRepoMetricsCassandra(testtools.TestCase):
             merge_metrics_flag=True)
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]['dimensions'], None)
+        self.assertIsNone(result[0]['dimensions'])
         self.assertEqual(result[0]['name'], 'disk.space_used_perc')
         self.assertEqual(result[0]['columns'],
                          ['timestamp', 'value', 'value_meta'])

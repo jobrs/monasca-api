@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2016 Hewlett-Packard Development Company, L.P.
+ * (C) Copyright 2014, 2016 Hewlett Packard Enterprise Development LP
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -13,6 +13,7 @@
  */
 package monasca.api.infrastructure.persistence.influxdb;
 
+import com.google.common.base.Joiner;
 import com.google.inject.Inject;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -42,6 +43,7 @@ public class InfluxV9MeasurementRepo implements MeasurementRepo {
       .getLogger(InfluxV9MeasurementRepo.class);
 
   private final static TypeReference VALUE_META_TYPE = new TypeReference<Map<String, String>>() {};
+  private final static Joiner COMMA_JOINER = Joiner.on(',');
 
   private final ApiConfig config;
   private final String region;
@@ -69,7 +71,7 @@ public class InfluxV9MeasurementRepo implements MeasurementRepo {
   public List<Measurements> find(String tenantId, String name, Map<String, String> dimensions,
                                  DateTime startTime, @Nullable DateTime endTime,
                                  @Nullable String offset, int limit, Boolean mergeMetricsFlag,
-                                 String groupBy)
+                                 List<String> groupBy)
       throws Exception {
 
     String q = buildQuery(tenantId, name, dimensions, startTime, endTime,
@@ -79,7 +81,7 @@ public class InfluxV9MeasurementRepo implements MeasurementRepo {
 
     Series series = this.objectMapper.readValue(r, Series.class);
 
-    List<Measurements> measurementsList = measurementsList(series, offset, limit);
+    List<Measurements> measurementsList = measurementsList(series, groupBy, offset, limit);
 
     logger.debug("Found {} metrics matching query", measurementsList.size());
 
@@ -88,39 +90,44 @@ public class InfluxV9MeasurementRepo implements MeasurementRepo {
 
   private String buildQuery(String tenantId, String name, Map<String, String> dimensions,
                             DateTime startTime, DateTime endTime, String offset, int limit,
-                            Boolean mergeMetricsFlag, String groupBy) throws Exception {
+                            Boolean mergeMetricsFlag, List<String> groupBy) throws Exception {
 
     String q;
-    if (Boolean.TRUE.equals(mergeMetricsFlag)) {
+    if (!groupBy.isEmpty()) {
 
       // The time column is automatically included in the results before all other columns.
       q = String.format("select value, value_meta %1$s "
-                        + "where %2$s %3$s %4$s %5$s %6$s",
-                        this.influxV9Utils.namePart(name, true),
-                        this.influxV9Utils.privateTenantIdPart(tenantId),
-                        this.influxV9Utils.privateRegionPart(this.region),
-                        this.influxV9Utils.startTimePart(startTime),
-                        this.influxV9Utils.dimPart(dimensions),
-                        this.influxV9Utils.endTimePart(endTime));
+                      + "where %2$s %3$s %4$s %5$s %6$s %7$s", //slimit 1
+              this.influxV9Utils.namePart(name, true),
+              this.influxV9Utils.privateTenantIdPart(tenantId),
+              this.influxV9Utils.privateRegionPart(this.region),
+              this.influxV9Utils.startTimePart(startTime),
+              this.influxV9Utils.dimPart(dimensions),
+              this.influxV9Utils.endTimePart(endTime),
+              this.influxV9Utils.groupByPart(groupBy));
 
     } else {
 
-      if (!"*".equals(groupBy) &&
-          !this.influxV9MetricDefinitionRepo.isAtMostOneSeries(tenantId, name, dimensions)) {
+      String groupByStr = "";
+      if (Boolean.FALSE.equals(mergeMetricsFlag) &&
+              !this.influxV9MetricDefinitionRepo.isAtMostOneSeries(tenantId, name, dimensions)) {
 
         throw new MultipleMetricsException(name, dimensions);
 
+      } else if (Boolean.FALSE.equals(mergeMetricsFlag)) {
+        groupByStr = " group by * ";
       }
+
       // The time column is automatically included in the results before all other columns.
       q = String.format("select value, value_meta %1$s "
-                        + "where %2$s %3$s %4$s %5$s %6$s %7$s", //slimit 1
+                        + "where %2$s %3$s %4$s %5$s %6$s %7$s",
                         this.influxV9Utils.namePart(name, true),
                         this.influxV9Utils.privateTenantIdPart(tenantId),
                         this.influxV9Utils.privateRegionPart(this.region),
                         this.influxV9Utils.startTimePart(startTime),
                         this.influxV9Utils.dimPart(dimensions),
                         this.influxV9Utils.endTimePart(endTime),
-                        this.influxV9Utils.groupByPart());
+                        groupByStr);
     }
 
     logger.debug("Measurements query: {}", q);
@@ -128,7 +135,7 @@ public class InfluxV9MeasurementRepo implements MeasurementRepo {
     return q;
   }
 
-  private List<Measurements> measurementsList(Series series, String offsetStr, int limit) {
+  private List<Measurements> measurementsList(Series series, List<String> groupBy, String offsetStr, int limit) {
     List<Measurements> measurementsList = new LinkedList<>();
 
     if (!series.isEmpty()) {
@@ -155,10 +162,31 @@ public class InfluxV9MeasurementRepo implements MeasurementRepo {
           continue;
         }
 
-        Measurements measurements =
-            new Measurements(serie.getName(),
-                             influxV9Utils.filterPrivateTags(serie.getTags()));
-        measurements.setId(Integer.toString(index));
+        Measurements lastMeasurements = null;
+        Measurements measurements = null;
+
+        if (!groupBy.isEmpty()) {
+          Map<String, String> dimensions = influxV9Utils.filterGroupByTags(
+                  influxV9Utils.filterPrivateTags(serie.getTags()),
+                  groupBy);
+
+          lastMeasurements = measurementsList.size() > 0 ?
+                  measurementsList.get(measurementsList.size() - 1) : null;
+
+
+          if (lastMeasurements != null && lastMeasurements.getDimensions().equals(dimensions))
+            measurements = measurementsList.get(measurementsList.size() - 1);
+
+        }
+
+        if (measurements == null){
+          measurements = new Measurements(serie.getName(),
+                  influxV9Utils.filterPrivateTags(serie.getTags()));
+
+          measurements.setId(Integer.toString(index));
+        }
+
+
 
         for (String[] values : serie.getValues()) {
           if (remaining_limit <= 0) {
@@ -174,7 +202,7 @@ public class InfluxV9MeasurementRepo implements MeasurementRepo {
           }
         }
 
-        if (measurements.getMeasurements().size() > 0) {
+        if (measurements != lastMeasurements && measurements.getMeasurements().size() > 0) {
           measurementsList.add(measurements);
         }
         index++;

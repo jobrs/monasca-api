@@ -45,7 +45,7 @@ class SQLRepository(object):
                                self.conf.mysql.password,
                                self.conf.mysql.hostname,
                                self.conf.mysql.database_name)
-                url = make_url("mysql+pymysql://{}:{}@{}/{}" % settings_db)
+                url = make_url("mysql+pymysql://%s:%s@%s/%s" % settings_db)
             else:
                 if self.conf.database.url is not None:
                     url = make_url(self.conf.database.url)
@@ -68,6 +68,7 @@ class SQLRepository(object):
 def sql_try_catch_block(fun):
     @STATSD_TIMER.timed(CONFIGDB_TIME, sample_rate=1)
     def try_it(*args, **kwargs):
+        # declare as global since it is modified
         global _statsd_configdb_error_count
 
         try:

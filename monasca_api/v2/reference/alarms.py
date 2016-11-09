@@ -327,7 +327,7 @@ class Alarms(alarms_api_v2.AlarmsV2API,
 
         return alarm
 
-    @STATSD_TIMER.timed(ALARMS_LIST_TIME, sample_rate=1)
+    @STATSD_TIMER.timed(ALARMS_LIST_TIME, sample_rate=0.1)
     @resource.resource_try_catch_block
     def _alarm_list(self, req_uri, tenant_id, query_parms, offset, limit):
 

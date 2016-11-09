@@ -24,7 +24,7 @@ Currently the devstack environment is needed to run the tests. Instructions on s
 4. Create ```etc/tempest.conf``` in the Tempest root dir by running the following command:
 
     ```
-    oslo-config-generator --config-file  etc/config-generator.tempest.conf  --output-file etc/tempest.conf
+    oslo-config-generator --config-file tempest/cmd/config-generator.tempest.conf  --output-file etc/tempest.conf
     ```
 
     Add the following sections to ```tempest.conf``` for testing using the devstack environment.
@@ -55,7 +55,7 @@ uri_v3 = http://127.0.0.1:35357/v3/
 
     ```
 
-    Edit the the variable values in the identity section to match your particular environment.
+    Edit the variable values in the identity section to match your particular environment.
 
 5. Create ```etc/logging.conf``` in the Tempest root dir by making a copying ```logging.conf.sample```.
 
@@ -103,6 +103,17 @@ The Monasca Tempest Tests can be run using a variety of methods including:
     testr run --load-list=monasca_tempest_tests
     ```
 You can also use testr to create a list of specific tests for your needs.
+
+## Run the tests using Tempest Run command
+
+``tempest run`` is a domain-specific command to be used as the primary
+entry point for running Tempest tests.
+
+1. In the Tempest root dir:
+
+    ```
+    tempest run -r monasca_tempest_tests
+    ```
 
 ## Run the tests from the CLI using os-testr (no file necessary)
 [Os-testr](http://docs.openstack.org/developer/os-testr/) is a test wrapper that can be used to run the Monasca Tempest tests.

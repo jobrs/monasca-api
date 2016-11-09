@@ -1,6 +1,5 @@
-# Copyright 2014 Hewlett-Packard
 # Copyright 2015 Cray Inc. All Rights Reserved.
-# Copyright 2016 Hewlett Packard Enterprise Development Company LP
+# (C) Copyright 2014,2016 Hewlett Packard Enterprise Development LP
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -289,6 +288,21 @@ def get_query_period(req):
         raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
 
 
+def get_query_group_by(req):
+    try:
+        params = falcon.uri.parse_query_string(req.query_string)
+        if 'group_by' in params:
+            group_by = params['group_by']
+            if not isinstance(group_by, list):
+                group_by = [group_by]
+            return group_by
+        else:
+            return None
+    except Exception as ex:
+        LOG.debug(ex)
+        raise HTTPUnprocessableEntityError('Unprocessable Entity', ex.message)
+
+
 def validate_query_name(name):
     """Validates the query param name.
 
@@ -353,6 +367,72 @@ def paginate(resource, uri, limit):
                     u'elements': resource}
 
     return resource
+
+
+def paginate_with_no_id(dictionary_list, uri, offset, limit):
+    """This method is to paginate a list of dictionaries with no id in it.
+       For example, metric name list, directory name list and directory
+       value list.
+    """
+    parsed_uri = urlparse.urlparse(uri)
+    self_link = build_base_uri(parsed_uri)
+    old_query_params = _get_old_query_params(parsed_uri)
+
+    if old_query_params:
+        self_link += '?' + '&'.join(old_query_params)
+
+    value_list = []
+    for item in dictionary_list:
+        value_list.extend(item.values())
+
+    if value_list:
+        # Truncate dictionary list with offset first
+        truncated_list_offset = _truncate_with_offset(
+            dictionary_list, value_list, offset)
+
+        # Then truncate it with limit
+        truncated_list_offset_limit = truncated_list_offset[:limit]
+
+        links = [{u'rel': u'self', u'href': self_link.decode('utf8')}]
+        if len(truncated_list_offset) > limit:
+            new_offset = truncated_list_offset_limit[limit - 1].values()[0]
+            next_link = build_base_uri(parsed_uri)
+            new_query_params = [u'offset' + '=' + new_offset]
+
+            _get_old_query_params_except_offset(new_query_params, parsed_uri)
+
+            if new_query_params:
+                next_link += '?' + '&'.join(new_query_params)
+
+            links.append({u'rel': u'next', u'href': next_link.decode('utf8')})
+
+        resource = {u'links': links,
+                    u'elements': truncated_list_offset_limit}
+    else:
+        resource = {u'links': ([{u'rel': u'self',
+                                 u'href': self_link.decode('utf8')}]),
+                    u'elements': dictionary_list}
+
+    return resource
+
+
+def _truncate_with_offset(resource, value_list, offset):
+    """Truncate a list of dictionaries with a given offset.
+    """
+    if not offset:
+        return resource
+
+    offset = offset.lower()
+    for i, j in enumerate(value_list):
+        # if offset matches one of the values in value_list,
+        # the truncated list should start with the one after current offset
+        if j == offset:
+            return resource[i + 1:]
+        # if offset does not exist in value_list, find the nearest
+        # location and truncate from that location.
+        if j > offset:
+            return resource[i:]
+    return []
 
 
 def paginate_alarming(resource, uri, limit):
@@ -453,7 +533,7 @@ def _truncate_dimension_values(values, limit, offset):
     return have_more, values[:limit]
 
 
-def paginate_measurement(measurement, uri, limit):
+def paginate_measurements(measurements, uri, limit):
     parsed_uri = urlparse.urlparse(uri)
 
     self_link = build_base_uri(parsed_uri)
@@ -463,41 +543,48 @@ def paginate_measurement(measurement, uri, limit):
     if old_query_params:
         self_link += '?' + '&'.join(old_query_params)
 
-    if (measurement
-            and measurement[0]
-            and measurement[0]['measurements']
-            and len(measurement[0]['measurements']) > limit):
+    if measurements:
+        measurement_elements = []
+        resource = {u'links': [{u'rel': u'self',
+                                u'href': self_link.decode('utf8')},
+                               ]}
+        for measurement in measurements:
+            if len(measurement['measurements']) >= limit:
 
-        new_offset = measurement[0]['measurements'][limit - 1][0]
+                new_offset = measurement['measurements'][limit - 1][0]
 
-        next_link = build_base_uri(parsed_uri)
+                next_link = build_base_uri(parsed_uri)
 
-        new_query_params = [u'offset' + '=' + urlparse.quote(
-            new_offset.encode('utf8'), safe='')]
+                new_query_params = [u'offset' + '=' + urlparse.quote(
+                    new_offset.encode('utf8'), safe='')]
 
-        _get_old_query_params_except_offset(new_query_params, parsed_uri)
+                _get_old_query_params_except_offset(new_query_params, parsed_uri)
 
-        if new_query_params:
-            next_link += '?' + '&'.join(new_query_params)
+                if new_query_params:
+                    next_link += '?' + '&'.join(new_query_params)
 
-        truncated_measurement = [{u'dimensions': measurement[0]['dimensions'],
-                                  u'measurements': (measurement[0]
-                                                    ['measurements'][:limit]),
-                                  u'name': measurement[0]['name'],
-                                  u'columns': measurement[0]['columns'],
-                                  u'id': new_offset}]
+                resource[u'links'].append({u'rel': u'next',
+                                           u'href': next_link.decode('utf8')})
 
-        resource = {u'links': ([{u'rel': u'self',
-                                 u'href': self_link.decode('utf8')},
-                                {u'rel': u'next',
-                                 u'href': next_link.decode('utf8')}]),
-                    u'elements': truncated_measurement}
+                truncated_measurement = {u'dimensions': measurement['dimensions'],
+                                         u'measurements': (measurement
+                                                           ['measurements'][:limit]),
+                                         u'name': measurement['name'],
+                                         u'columns': measurement['columns'],
+                                         u'id': measurement['id']}
+                measurement_elements.append(truncated_measurement)
+                break
+            else:
+                limit -= len(measurement['measurements'])
+                measurement_elements.append(measurement)
+
+        resource[u'elements'] = measurement_elements
 
     else:
 
         resource = {u'links': ([{u'rel': u'self',
                                  u'href': self_link.decode('utf8')}]),
-                    u'elements': measurement}
+                    u'elements': []}
 
     return resource
 
@@ -531,7 +618,7 @@ def _get_old_query_params_except_offset(new_query_params, parsed_uri):
                         'utf8'), safe=''))
 
 
-def paginate_statistics(statistic, uri, limit):
+def paginate_statistics(statistics, uri, limit):
     parsed_uri = urlparse.urlparse(uri)
 
     self_link = build_base_uri(parsed_uri)
@@ -541,41 +628,49 @@ def paginate_statistics(statistic, uri, limit):
     if old_query_params:
         self_link += '?' + '&'.join(old_query_params)
 
-    if (statistic
-            and statistic[0]
-            and statistic[0]['statistics']
-            and len(statistic[0]['statistics']) > limit):
+    if statistics:
+        statistic_elements = []
+        resource = {u'links': [{u'rel': u'self',
+                                u'href': self_link.decode('utf8')}]}
 
-        new_offset = (
-            statistic[0]['statistics'][limit - 1][0])
+        for statistic in statistics:
+            if len(statistic['statistics']) >= limit:
 
-        next_link = build_base_uri(parsed_uri)
+                new_offset = (
+                    statistic['statistics'][limit - 1][0])
 
-        new_query_params = [u'offset' + '=' + urlparse.quote(
-            new_offset.encode('utf8'), safe='')]
+                next_link = build_base_uri(parsed_uri)
 
-        _get_old_query_params_except_offset(new_query_params, parsed_uri)
+                new_query_params = [u'offset' + '=' + urlparse.quote(
+                    new_offset.encode('utf8'), safe='')]
 
-        if new_query_params:
-            next_link += '?' + '&'.join(new_query_params)
+                _get_old_query_params_except_offset(new_query_params, parsed_uri)
 
-        truncated_statistic = [{u'dimensions': statistic[0]['dimensions'],
-                                u'statistics': (statistic[0]['statistics'][:limit]),
-                                u'name': statistic[0]['name'],
-                                u'columns': statistic[0]['columns'],
-                                u'id': new_offset}]
+                if new_query_params:
+                    next_link += '?' + '&'.join(new_query_params)
 
-        resource = {u'links': ([{u'rel': u'self',
-                                 u'href': self_link.decode('utf8')},
-                                {u'rel': u'next',
-                                 u'href': next_link.decode('utf8')}]),
-                    u'elements': truncated_statistic}
+                resource[u'links'].append({u'rel': u'next',
+                                          u'href': next_link.decode('utf8')})
+
+                truncated_statistic = {u'dimensions': statistic['dimensions'],
+                                       u'statistics': (statistic['statistics'][:limit]),
+                                       u'name': statistic['name'],
+                                       u'columns': statistic['columns'],
+                                       u'id': statistic['id']}
+
+                statistic_elements.append(truncated_statistic)
+                break
+            else:
+                limit -= len(statistic['statistics'])
+                statistic_elements.append(statistic)
+
+        resource[u'elements'] = statistic_elements
 
     else:
 
         resource = {u'links': ([{u'rel': u'self',
                                  u'href': self_link.decode('utf8')}]),
-                    u'elements': statistic}
+                    u'elements': []}
 
     return resource
 

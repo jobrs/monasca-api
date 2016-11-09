@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014,2016 Hewlett Packard Enterprise Development Company, L.P.
+ * (C) Copyright 2014,2016 Hewlett Packard Enterprise Development LP
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+
 import org.joda.time.DateTime;
 import org.skife.jdbi.v2.Handle;
 import org.skife.jdbi.v2.Query;
@@ -35,8 +36,8 @@ import monasca.api.domain.model.measurement.Measurements;
  */
 final class MetricQueries {
   private static final Splitter BAR_SPLITTER = Splitter.on('|').omitEmptyStrings().trimResults();
-  private static final char OFFSET_SEPARATOR = '_';
-  private static final Splitter offsetSplitter = Splitter.on(OFFSET_SEPARATOR).omitEmptyStrings().trimResults();
+  private static final Splitter UNDERSCORE_SPLITTER = Splitter.on('_').omitEmptyStrings().trimResults();
+  private static final Splitter COMMA_SPLITTER = Splitter.on(',').omitEmptyStrings().trimResults();
 
   static final String FIND_METRIC_DEFS_SQL =
       "SELECT %s TO_HEX(defDims.id) as defDimsId, def.name, dims.name as dName, dims.value AS dValue "
@@ -52,15 +53,18 @@ final class MetricQueries {
       "SELECT TO_HEX(defDimsSub.id) as id "
       + "FROM MonMetrics.Definitions as defSub "
       + "JOIN MonMetrics.DefinitionDimensions as defDimsSub ON defDimsSub.definition_id = defSub.id "
+      + "%s " // possible measurements time join here
       + "WHERE defSub.tenant_id = :tenantId "
       + "%s " // metric name here
       + "%s " // dimension and clause here
-      + "%s " // time and clause here
+      + "%s " // possible time and clause here
       + "GROUP BY defDimsSub.id";
 
   private static final String MEASUREMENT_AND_CLAUSE =
-      "SELECT definition_dimensions_id FROM MonMetrics.Measurements "
-      + "WHERE time_stamp >= :startTime "; // start or start and end time here
+      "AND time_stamp >= :startTime "; // start or start and end time here
+
+  private static final String MEASUREMENT_JOIN =
+      "JOIN MonMetrics.Measurements AS meas ON defDimsSub.id = meas.definition_dimensions_id";
 
   private static final String TABLE_TO_JOIN_ON = "defDimsSub";
 
@@ -76,11 +80,10 @@ final class MetricQueries {
     }
 
     return String.format(METRIC_DEF_SUB_SQL,
+                         buildTimeJoin(startTime),
                          namePart,
-                         buildDimensionAndClause(dimensions,
-                                                 TABLE_TO_JOIN_ON),
-                         buildTimeAndClause(startTime, endTime,
-                                            TABLE_TO_JOIN_ON));
+                         buildDimensionAndClause(dimensions, TABLE_TO_JOIN_ON),
+                         buildTimeAndClause(startTime, endTime));
   }
 
   static String buildDimensionAndClause(Map<String, String> dimensions,
@@ -92,8 +95,11 @@ final class MetricQueries {
 
     StringBuilder sb = new StringBuilder();
     sb.append(" and ").append(tableToJoinName).append(
-              ".dimension_set_id in ( "
-              + "SELECT dimension_set_id FROM MonMetrics.Dimensions WHERE (");
+              ".id in ( "
+              + "SELECT defDimsSub2.id FROM MonMetrics.Dimensions AS dimSub " +
+                "JOIN MonMetrics.DefinitionDimensions AS defDimsSub2 " +
+                "ON defDimsSub2.dimension_set_id = dimSub.dimension_set_id" +
+                " WHERE (");
 
     int i = 0;
     for (Iterator<Map.Entry<String, String>> it = dimensions.entrySet().iterator(); it.hasNext(); i++) {
@@ -128,7 +134,7 @@ final class MetricQueries {
       }
     }
 
-    sb.append(") GROUP BY dimension_set_id HAVING count(*) = ").append(dimensions.size()).append(") ");
+    sb.append(") GROUP BY defDimsSub2.id,dimSub.dimension_set_id HAVING count(*) = ").append(dimensions.size()).append(") ");
 
 
     return sb.toString();
@@ -136,8 +142,7 @@ final class MetricQueries {
 
   static String buildTimeAndClause(
       DateTime startTime,
-      DateTime endTime,
-      String tableToJoin)
+      DateTime endTime)
   {
     if (startTime == null) {
       return "";
@@ -145,17 +150,22 @@ final class MetricQueries {
 
     StringBuilder timeAndClause = new StringBuilder();
 
-    timeAndClause.append("AND ").append(tableToJoin).append(".id IN (");
-
     timeAndClause.append(MEASUREMENT_AND_CLAUSE);
 
     if (endTime != null) {
       timeAndClause.append("AND time_stamp <= :endTime ");
     }
 
-    timeAndClause.append(")");
-
     return timeAndClause.toString();
+  }
+
+  static String buildTimeJoin(DateTime startTime)
+  {
+    if (startTime == null) {
+      return "";
+    }
+
+    return MEASUREMENT_JOIN;
   }
 
   static void bindDimensionsToQuery(Query<?> query, Map<String, String> dimensions) {
@@ -180,7 +190,7 @@ final class MetricQueries {
   }
 
   static void bindOffsetToQuery(Query<Map<String, Object>> query, String offset) {
-    List<String> offsets =  offsetSplitter.splitToList(offset);
+    List<String> offsets =  UNDERSCORE_SPLITTER.splitToList(offset);
     if (offsets.size() > 1) {
       query.bind("offset_id", offsets.get(0));
       query.bind("offset_timestamp",
@@ -200,6 +210,7 @@ final class MetricQueries {
     }
 
     String sql = String.format(METRIC_DEF_SUB_SQL,
+                               "",
                                namePart,
                                buildDimensionAndClause(dimensions,
                                                  TABLE_TO_JOIN_ON),
@@ -279,6 +290,67 @@ final class MetricQueries {
 
       }
 
+    }
+  }
+
+  static Map<String, String> combineGroupByAndValues(List<String> groupBy, String valueStr) {
+    List<String> values = COMMA_SPLITTER.splitToList(valueStr);
+    Map<String, String> newDimensions = new HashMap<>();
+    for (int i = 0; i < groupBy.size(); i++) {
+      newDimensions.put(groupBy.get(i), values.get(i));
+    }
+    return newDimensions;
+  }
+
+  static String buildGroupByConcatString(List<String> groupBy) {
+    if (groupBy.isEmpty() || "*".equals(groupBy.get(0)))
+      return "";
+
+    String select = "(";
+    for (int i = 0; i < groupBy.size(); i++) {
+      if (i > 0)
+        select += " || ',' || ";
+      select += "gb" + i + ".value";
+    }
+    select += ")";
+    return select;
+  }
+
+  static String buildGroupByCommaString(List<String> groupBy) {
+    String result = "";
+    if (!groupBy.contains("*")) {
+      for (int i = 0; i < groupBy.size(); i++) {
+        if (i > 0) {
+          result += ',';
+        }
+        result += "gb" + i + ".value";
+      }
+    }
+
+    return result;
+  }
+
+  static String buildGroupBySql(List<String> groupBy) {
+    if (groupBy.isEmpty() || "*".equals(groupBy.get(0)))
+      return "";
+
+    StringBuilder groupBySql = new StringBuilder(
+            " JOIN MonMetrics.DefinitionDimensions as dd on dd.id = mes.definition_dimensions_id ");
+
+    for (int i = 0; i < groupBy.size(); i++) {
+      groupBySql.append("JOIN (SELECT dimension_set_id,value FROM MonMetrics.Dimensions WHERE name = ");
+      groupBySql.append(":groupBy").append(i).append(") as gb").append(i);
+      groupBySql.append(" ON gb").append(i).append(".dimension_set_id = dd.dimension_set_id ");
+    }
+
+    return groupBySql.toString();
+  }
+
+  static void bindGroupBy(Query<Map<String, Object>> query, List<String> groupBy) {
+    int i = 0;
+    for (String value: groupBy) {
+      query.bind("groupBy" + i, value);
+      i++;
     }
   }
 }

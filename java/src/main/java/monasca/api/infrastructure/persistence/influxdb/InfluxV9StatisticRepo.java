@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2014, 2016 Hewlett-Packard Development LP
+ * (C) Copyright 2014, 2016 Hewlett Packard Enterprise Development LP
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -72,15 +72,16 @@ public class InfluxV9StatisticRepo implements StatisticRepo {
   public List<Statistics> find(String tenantId, String name, Map<String, String> dimensions,
                                DateTime startTime, @Nullable DateTime endTime,
                                List<String> statistics, int period, String offset, int limit,
-                               Boolean mergeMetricsFlag, String groupBy) throws Exception {
+                               Boolean mergeMetricsFlag, List<String> groupBy) throws Exception {
 
     String offsetTimePart = "";
     if (!Strings.isNullOrEmpty(offset)) {
       int indexOfUnderscore = offset.indexOf('_');
       if (indexOfUnderscore > -1) {
         offsetTimePart = offset.substring(indexOfUnderscore + 1);
-        // Add the period to the offset to ensure only the next group of points are returned
-        DateTime offsetDateTime = DateTime.parse(offsetTimePart).plusSeconds(period);
+        // Add the period minus one millisecond to the offset
+        // to ensure only the next group of points are returned
+        DateTime offsetDateTime = DateTime.parse(offsetTimePart).plusSeconds(period).minusMillis(1);
         // leave out any ID, as influx doesn't understand it
         offset = offsetDateTime.toString();
       }
@@ -104,7 +105,7 @@ public class InfluxV9StatisticRepo implements StatisticRepo {
   private String buildQuery(String tenantId, String name, Map<String, String> dimensions,
                             DateTime startTime, DateTime endTime, List<String> statistics,
                             int period, String offset, int limit, Boolean mergeMetricsFlag,
-                            String groupBy)
+                            List<String> groupBy)
       throws Exception {
 
     String offsetTimePart = "";
@@ -115,7 +116,7 @@ public class InfluxV9StatisticRepo implements StatisticRepo {
 
     String q;
 
-    if (Boolean.TRUE.equals(mergeMetricsFlag)) {
+     if (!groupBy.isEmpty()) {
 
       q = String.format("select %1$s %2$s "
                         + "where %3$s %4$s %5$s %6$s %7$s %8$s %9$s %10$s",
@@ -127,28 +128,30 @@ public class InfluxV9StatisticRepo implements StatisticRepo {
                         this.influxV9Utils.dimPart(dimensions),
                         this.influxV9Utils.endTimePart(endTime),
                         this.influxV9Utils.timeOffsetPart(offsetTimePart),
-                        this.influxV9Utils.periodPart(period),
+                        this.influxV9Utils.periodPartWithGroupBy(period, groupBy),
                         this.influxV9Utils.limitPart(limit));
-
     } else {
 
-      if (!"*".equals(groupBy) &&
-          !this.influxV9MetricDefinitionRepo.isAtMostOneSeries(tenantId, name, dimensions)) {
+       if (Boolean.FALSE.equals(mergeMetricsFlag) &&
+               !this.influxV9MetricDefinitionRepo.isAtMostOneSeries(tenantId, name, dimensions)) {
 
-        throw new MultipleMetricsException(name, dimensions);
+         throw new MultipleMetricsException(name, dimensions);
 
-      }
+       }
 
       q = String.format("select %1$s %2$s "
-                        + "where %3$s %4$s %5$s %6$s %7$s %8$s",
-                        funcPart(statistics),
-                        this.influxV9Utils.namePart(name, true),
-                        this.influxV9Utils.privateTenantIdPart(tenantId),
-                        this.influxV9Utils.privateRegionPart(this.region),
-                        this.influxV9Utils.startTimePart(startTime),
-                        this.influxV9Utils.dimPart(dimensions),
-                        this.influxV9Utils.endTimePart(endTime),
-                        this.influxV9Utils.periodPartWithGroupBy(period));
+                      + "where %3$s %4$s %5$s %6$s %7$s %8$s %9$s %10$s",
+              funcPart(statistics),
+              this.influxV9Utils.namePart(name, true),
+              this.influxV9Utils.privateTenantIdPart(tenantId),
+              this.influxV9Utils.privateRegionPart(this.region),
+              this.influxV9Utils.startTimePart(startTime),
+              this.influxV9Utils.dimPart(dimensions),
+              this.influxV9Utils.endTimePart(endTime),
+              this.influxV9Utils.timeOffsetPart(offsetTimePart),
+              this.influxV9Utils.periodPart(period, mergeMetricsFlag),
+              this.influxV9Utils.limitPart(limit));
+
     }
 
     logger.debug("Statistics query: {}", q);
@@ -196,6 +199,8 @@ public class InfluxV9StatisticRepo implements StatisticRepo {
           }
 
           List<Object> values = buildValsList(valueObjects);
+          if (values == null)
+            continue;
 
           if (((String) values.get(0)).compareTo(offsetTimestamp) >= 0 || index > offsetId) {
             statistics.addMeasurement(values);
@@ -229,9 +234,13 @@ public class InfluxV9StatisticRepo implements StatisticRepo {
     else
       valObjArryList.add(timestamp);
 
-    // All other values are doubles.
+    // All other values are doubles or nulls.
     for (int i = 1; i < values.length; ++i) {
-      valObjArryList.add(Double.parseDouble((String) values[i]));
+      if (values[i] != null) {
+        valObjArryList.add(Double.parseDouble((String) values[i]));
+      } else {
+        return null;
+      }
     }
 
     return valObjArryList;

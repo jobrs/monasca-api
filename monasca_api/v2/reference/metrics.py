@@ -1,4 +1,4 @@
-# (C) Copyright 2014, 2016 Hewlett Packard Enterprise Development Company LP
+# (C) Copyright 2014, 2016 Hewlett Packard Enterprise Development LP
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -203,11 +203,13 @@ class MetricsMeasurements(metrics_api_v2.MetricsMeasurementsV2API):
         offset = helpers.get_query_param(req, 'offset')
         limit = helpers.get_limit(req)
         merge_metrics_flag = get_merge_metrics_flag(req)
+        group_by = helpers.get_query_group_by(req)
 
         result = self._measurement_list(tenant_id, name, dimensions,
                                         start_timestamp, end_timestamp,
                                         req.uri, offset,
-                                        limit, merge_metrics_flag)
+                                        limit, merge_metrics_flag,
+                                        group_by)
 
         res.body = helpers.dumpit_utf8(result)
         res.status = falcon.HTTP_200
@@ -215,7 +217,7 @@ class MetricsMeasurements(metrics_api_v2.MetricsMeasurementsV2API):
     @resource.resource_try_catch_block
     def _measurement_list(self, tenant_id, name, dimensions, start_timestamp,
                           end_timestamp, req_uri, offset,
-                          limit, merge_metrics_flag):
+                          limit, merge_metrics_flag, group_by):
 
         result = self._metrics_repo.measurement_list(tenant_id,
                                                      self._region,
@@ -225,9 +227,10 @@ class MetricsMeasurements(metrics_api_v2.MetricsMeasurementsV2API):
                                                      end_timestamp,
                                                      offset,
                                                      limit,
-                                                     merge_metrics_flag)
+                                                     merge_metrics_flag,
+                                                     group_by)
 
-        return helpers.paginate_measurement(result, req_uri, limit)
+        return helpers.paginate_measurements(result, req_uri, limit)
 
 
 class MetricsStatistics(metrics_api_v2.MetricsStatisticsV2API):
@@ -262,11 +265,13 @@ class MetricsStatistics(metrics_api_v2.MetricsStatisticsV2API):
         offset = helpers.get_query_param(req, 'offset')
         limit = helpers.get_limit(req)
         merge_metrics_flag = get_merge_metrics_flag(req)
+        group_by = helpers.get_query_group_by(req)
 
         result = self._metric_statistics(tenant_id, name, dimensions,
                                          start_timestamp, end_timestamp,
                                          statistics, period, req.uri,
-                                         offset, limit, merge_metrics_flag)
+                                         offset, limit, merge_metrics_flag,
+                                         group_by)
 
         res.body = helpers.dumpit_utf8(result)
         res.status = falcon.HTTP_200
@@ -274,7 +279,7 @@ class MetricsStatistics(metrics_api_v2.MetricsStatisticsV2API):
     @resource.resource_try_catch_block
     def _metric_statistics(self, tenant_id, name, dimensions, start_timestamp,
                            end_timestamp, statistics, period, req_uri,
-                           offset, limit, merge_metrics_flag):
+                           offset, limit, merge_metrics_flag, group_by):
 
         result = self._metrics_repo.metrics_statistics(tenant_id,
                                                        self._region,
@@ -285,7 +290,8 @@ class MetricsStatistics(metrics_api_v2.MetricsStatisticsV2API):
                                                        statistics, period,
                                                        offset,
                                                        limit,
-                                                       merge_metrics_flag)
+                                                       merge_metrics_flag,
+                                                       group_by)
 
         return helpers.paginate_statistics(result, req_uri, limit)
 
@@ -324,10 +330,9 @@ class MetricsNames(metrics_api_v2.MetricsNamesV2API):
 
         result = self._metrics_repo.list_metric_names(tenant_id,
                                                       self._region,
-                                                      dimensions,
-                                                      offset, limit)
+                                                      dimensions)
 
-        return helpers.paginate(result, req_uri, limit)
+        return helpers.paginate_with_no_id(result, req_uri, offset, limit)
 
 
 class DimensionValues(metrics_api_v2.DimensionValuesV2API):
@@ -351,7 +356,8 @@ class DimensionValues(metrics_api_v2.DimensionValuesV2API):
         helpers.validate_authorization(req, self._get_metrics_authorized_roles)
         tenant_id = helpers.get_tenant_id(req)
         metric_name = helpers.get_query_param(req, 'metric_name')
-        dimension_name = helpers.get_query_param(req, 'dimension_name', required=True)
+        dimension_name = helpers.get_query_param(req, 'dimension_name',
+                                                 required=True)
         offset = helpers.get_query_param(req, 'offset')
         limit = helpers.get_limit(req)
         result = self._dimension_values(tenant_id, req.uri, metric_name,
@@ -366,8 +372,43 @@ class DimensionValues(metrics_api_v2.DimensionValuesV2API):
         result = self._metrics_repo.list_dimension_values(tenant_id,
                                                           self._region,
                                                           metric_name,
-                                                          dimension_name,
-                                                          offset,
-                                                          limit)
+                                                          dimension_name)
 
-        return helpers.paginate_dimension_values(result, req_uri, offset, limit)
+        return helpers.paginate_with_no_id(result, req_uri, offset, limit)
+
+
+class DimensionNames(metrics_api_v2.DimensionNamesV2API):
+    def __init__(self):
+        try:
+            super(DimensionNames, self).__init__()
+            self._region = cfg.CONF.region
+            self._get_metrics_authorized_roles = (
+                cfg.CONF.security.default_authorized_roles +
+                cfg.CONF.security.read_only_authorized_roles)
+            self._metrics_repo = simport.load(
+                cfg.CONF.repositories.metrics_driver)()
+
+        except Exception as ex:
+            LOG.exception(ex)
+            raise falcon.HTTPInternalServerError('Service unavailable',
+                                                 ex.message)
+
+    def on_get(self, req, res):
+        helpers.validate_authorization(req, self._get_metrics_authorized_roles)
+        tenant_id = helpers.get_tenant_id(req)
+        metric_name = helpers.get_query_param(req, 'metric_name')
+        offset = helpers.get_query_param(req, 'offset')
+        limit = helpers.get_limit(req)
+        result = self._dimension_names(tenant_id, req.uri, metric_name,
+                                       offset, limit)
+        res.body = helpers.dumpit_utf8(result)
+        res.status = falcon.HTTP_200
+
+    @resource.resource_try_catch_block
+    def _dimension_names(self, tenant_id, req_uri, metric_name, offset, limit):
+
+        result = self._metrics_repo.list_dimension_names(tenant_id,
+                                                         self._region,
+                                                         metric_name)
+
+        return helpers.paginate_with_no_id(result, req_uri, offset, limit)
