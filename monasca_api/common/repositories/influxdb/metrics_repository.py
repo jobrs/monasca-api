@@ -527,6 +527,8 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
             else:
 
                 LOG.exception(ex)
+                if ex.code == 400:
+                    LOG.error("Invalid query: %s", query)
 
                 raise exceptions.RepositoryException(ex)
 
