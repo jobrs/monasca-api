@@ -15,6 +15,7 @@
 import re
 
 import falcon
+from jinja2 import Template, TemplateSyntaxError
 from monasca_common.simport import simport
 from oslo_config import cfg
 from oslo_log import log
@@ -175,6 +176,32 @@ class Alarms(alarms_api_v2.AlarmsV2API,
             res.status = falcon.HTTP_200
 
     @staticmethod
+    def _render_alarm(alarm):
+        """
+        Expands template variables contained in an alarm
+        :param alarm: the alarm json as dict
+        :return the expanded alarm with placeholders being substituted
+        """
+        template_vars = {}
+        for metric in alarm['metrics']:
+            for k, v in metric['dimensions'].iteritems():
+                old = template_vars.get(k)
+                if not old:
+                    template_vars[k] = v
+                elif isinstance(old, set):
+                    old.add(v)
+                else:
+                    template_vars[k] = {old, v}
+
+        desc = alarm['alarm_definition']['description']
+        try:
+            alarm['alarm_definition']['description'] = Template(desc).render(**template_vars)
+        except TemplateSyntaxError:
+            pass
+        except Exception:
+            log.exception("failed rendering alarm-definition: %s", desc)
+
+    @staticmethod
     def _validate_dimensions(dimensions):
         try:
             assert isinstance(dimensions, list)
@@ -312,6 +339,7 @@ class Alarms(alarms_api_v2.AlarmsV2API,
                              alarm_row['created_timestamp'].isoformat() + 'Z',
                          u'alarm_definition': ad}
                 helpers.add_links_to_resource(alarm, req_uri_no_id)
+                Alarms._render_alarm(alarm)
 
                 first_row = False
 
@@ -370,6 +398,7 @@ class Alarms(alarms_api_v2.AlarmsV2API,
                              alarm_row['created_timestamp'].isoformat() + 'Z',
                          u'alarm_definition': ad}
                 helpers.add_links_to_resource(alarm, req_uri)
+                Alarms._render_alarm(alarm)
 
                 prev_alarm_id = alarm_row['alarm_id']
 

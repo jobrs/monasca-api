@@ -28,3 +28,5 @@ gunicorn
 PyMySQL
 python-memcached
 monasca-statsd
+
+jinja2
