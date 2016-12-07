@@ -291,6 +291,7 @@ class Alarms(alarms_api_v2.AlarmsV2API,
             if first_row:
                 ad = {u'id': alarm_row['alarm_definition_id'],
                       u'name': alarm_row['alarm_definition_name'],
+                      u'description': alarm_row['alarm_definition_description'],
                       u'severity': alarm_row['severity'], }
                 helpers.add_links_to_resource(ad,
                                               re.sub('alarms',
@@ -348,6 +349,7 @@ class Alarms(alarms_api_v2.AlarmsV2API,
 
                 ad = {u'id': alarm_row['alarm_definition_id'],
                       u'name': alarm_row['alarm_definition_name'],
+                      u'description': alarm_row['alarm_definition_description'],
                       u'severity': alarm_row['severity'], }
                 helpers.add_links_to_resource(ad,
                                               re.sub('alarms',

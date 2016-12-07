@@ -34,6 +34,7 @@ class AlarmsRepository(mysql_repository.MySQLRepository,
           a.updated_at as updated_timestamp,
           a.created_at as created_timestamp, a.lifecycle_state, a.link,
           ad.id as alarm_definition_id, ad.name as alarm_definition_name,
+          ad.description as alarm_definition_description,
           ad.severity,
           md.name as metric_name, mdg.dimensions as metric_dimensions
           from alarm as a
@@ -56,6 +57,7 @@ class AlarmsRepository(mysql_repository.MySQLRepository,
           a.updated_at as updated_timestamp,
           a.created_at as created_timestamp, a.lifecycle_state, a.link,
           ad.id as alarm_definition_id, ad.name as alarm_definition_name,
+          ad.description as alarm_definition_description,
           ad.severity,
           md.name as metric_name, mdg.dimensions as metric_dimensions
           from alarm as a
