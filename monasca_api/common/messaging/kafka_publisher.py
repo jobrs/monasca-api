@@ -77,15 +77,15 @@ class KafkaPublisher(publisher.Publisher):
                 return
             except common.KafkaUnavailableError as e:
                 last_exception = e
-                LOG.error('Kafka server at %s is down.' % self.uri)
+                LOG.error('Kafka server at %s is down.', self.uri)
                 self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
             except common.LeaderNotAvailableError as e:
                 last_exception = e
-                LOG.error('Kafka at %s has no leader available.' % self.uri)
+                LOG.error('Kafka at %s has no leader available.', self.uri)
                 self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
             except Exception as e:
                 last_exception = e
-                LOG.exception('Kafka at %s initialization failed.' % self.uri)
+                LOG.exception('Kafka at %s initialization failed.', self.uri)
                 self.statsd_kafka_producer_error_count.increment(1, sample_rate=1.0)
 
             # Wait a bit and try again to get a client
