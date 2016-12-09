@@ -339,7 +339,6 @@ class Alarms(alarms_api_v2.AlarmsV2API,
                              alarm_row['created_timestamp'].isoformat() + 'Z',
                          u'alarm_definition': ad}
                 helpers.add_links_to_resource(alarm, req_uri_no_id)
-                Alarms._render_alarm(alarm)
 
                 first_row = False
 
@@ -353,6 +352,8 @@ class Alarms(alarms_api_v2.AlarmsV2API,
                     dimensions[parsed_dimension[0]] = parsed_dimension[1]
 
             metrics.append(metric)
+
+        Alarms._render_alarm(alarm)
 
         return alarm
 
@@ -398,7 +399,6 @@ class Alarms(alarms_api_v2.AlarmsV2API,
                              alarm_row['created_timestamp'].isoformat() + 'Z',
                          u'alarm_definition': ad}
                 helpers.add_links_to_resource(alarm, req_uri)
-                Alarms._render_alarm(alarm)
 
                 prev_alarm_id = alarm_row['alarm_id']
 
@@ -412,6 +412,8 @@ class Alarms(alarms_api_v2.AlarmsV2API,
                     dimensions[parsed_dimension[0]] = parsed_dimension[1]
 
             metrics.append(metric)
+
+        Alarms._render_alarm(alarm)
 
         result.append(alarm)
 
