@@ -14,6 +14,7 @@
 
 import re
 
+import datetime
 import falcon
 from jinja2 import Template, TemplateSyntaxError
 from monasca_common.simport import simport
@@ -194,8 +195,9 @@ class Alarms(alarms_api_v2.AlarmsV2API,
                 else:
                     template_vars[k] = {old, v}
         # add additional variables (TODO: add the metric value)
-        template_vars['_timestamp'] = int(alarm['state_updated_timestamp']) / 1000
-        template_vars['_age'] = time.time() - template_vars['_timestamp']
+        ts = datetime.datetime.strptime(alarm['state_updated_timestamp'], "%Y-%m-%dT%H:%M:%S.%fZ")
+        template_vars['_age'] = time.time() - time.mktime(ts.timetuple())
+        template_vars['_timestamp'] = alarm['state_updated_timestamp']
         template_vars['_state'] = alarm['state']
 
         desc = alarm['alarm_definition']['description']
