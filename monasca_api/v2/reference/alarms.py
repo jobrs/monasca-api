@@ -19,6 +19,7 @@ from jinja2 import Template, TemplateSyntaxError
 from monasca_common.simport import simport
 from oslo_config import cfg
 from oslo_log import log
+import time
 
 from monasca_api.api import alarms_api_v2
 from monasca_api.common.repositories import exceptions
@@ -192,11 +193,16 @@ class Alarms(alarms_api_v2.AlarmsV2API,
                     old.add(v)
                 else:
                     template_vars[k] = {old, v}
+        # add additional variables (TODO: add the metric value)
+        template_vars['_timestamp'] = alarm['state_updated_timestamp'] / 1000
+        template_vars['_age'] = time.time() - template_vars['_timestamp']
+        template_vars['_state'] = alarm['state']
 
         desc = alarm['alarm_definition']['description']
         try:
             alarm['alarm_definition']['description'] = Template(desc).render(**template_vars)
-        except TemplateSyntaxError:
+        except TemplateSyntaxError as ex:
+            log.debug('alarm-definition %s does not follow Jinja2 syntax: %s', alarm['alarm_definition']['id'], ex.message)
             pass
         except Exception:
             log.exception("failed rendering alarm-definition: %s", desc)
