@@ -195,7 +195,7 @@ class Alarms(alarms_api_v2.AlarmsV2API,
                 else:
                     template_vars[k] = {old, v}
         # add additional variables (TODO: add the metric value)
-        ts = datetime.datetime.strptime(alarm['state_updated_timestamp'], "%Y-%m-%dT%H:%M:%S.%fZ")
+        ts = datetime.datetime.strptime(alarm['state_updated_timestamp'], "%Y-%m-%dT%H:%M:%SZ")
         template_vars['_age'] = time.time() - time.mktime(ts.timetuple())
         template_vars['_timestamp'] = alarm['state_updated_timestamp']
         template_vars['_state'] = alarm['state']
