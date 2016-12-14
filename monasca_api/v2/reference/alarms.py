@@ -194,7 +194,7 @@ class Alarms(alarms_api_v2.AlarmsV2API,
                 else:
                     template_vars[k] = {old, v}
         # add additional variables (TODO: add the metric value)
-        template_vars['_timestamp'] = alarm['state_updated_timestamp'] / 1000
+        template_vars['_timestamp'] = int(alarm['state_updated_timestamp']) / 1000
         template_vars['_age'] = time.time() - template_vars['_timestamp']
         template_vars['_state'] = alarm['state']
 
