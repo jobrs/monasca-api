@@ -382,6 +382,7 @@ class Alarms(alarms_api_v2.AlarmsV2API,
         for alarm_row in alarm_rows:
             if prev_alarm_id != alarm_row['alarm_id']:
                 if prev_alarm_id is not None:
+                    Alarms._render_alarm(alarm)
                     result.append(alarm)
 
                 ad = {u'id': alarm_row['alarm_definition_id'],
