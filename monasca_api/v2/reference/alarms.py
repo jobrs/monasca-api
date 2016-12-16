@@ -200,14 +200,14 @@ class Alarms(alarms_api_v2.AlarmsV2API,
         template_vars['_timestamp'] = alarm['state_updated_timestamp']
         template_vars['_state'] = alarm['state']
 
-        desc = alarm['alarm_definition']['description']
+        desc = alarm[u'alarm_definition'][u'description']
         try:
-            alarm['alarm_definition']['description'] = Template(desc).render(**template_vars)
+            alarm[u'alarm_definition'][u'description'] = Template(desc).render(**template_vars)
         except TemplateSyntaxError as ex:
-            log.debug('alarm-definition %s does not follow Jinja2 syntax: %s', alarm['alarm_definition']['id'], ex.message)
+            LOG.debug('alarm-definition %s does not follow Jinja2 syntax: %s', alarm[u'alarm_definition'][u'id'], ex.message)
             pass
         except Exception:
-            log.exception("failed rendering alarm-definition: %s", desc)
+            LOG.exception("failed rendering alarm-definition: %s", desc)
 
     @staticmethod
     def _validate_dimensions(dimensions):
