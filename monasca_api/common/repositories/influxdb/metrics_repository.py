@@ -326,9 +326,9 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
         json_metric_list = sorted(json_metric_list)
         return json_metric_list
 
-    def _get_dimensions(self, tenant_id, region, name, dimensions, start_time=None, end_time=None):
+    def _get_dimensions(self, tenant_id, region, name, dimensions):
         metrics_list = self.list_metrics(tenant_id, region, name,
-                                         dimensions, None, 2, start_timestamp=start_time, end_timestamp=end_time)
+                                         dimensions, None, 2)
 
         if len(metrics_list) > 1:
             raise exceptions.MultipleMetricsException(self.MULTIPLE_METRICS_MESSAGE)
@@ -354,7 +354,7 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
                                                          limit)
 
             if not group_by and not merge_metrics_flag:
-                dimensions = self._get_dimensions(tenant_id, region, name, dimensions, start_time=start_timestamp, end_time=end_timestamp)
+                dimensions = self._get_dimensions(tenant_id, region, name, dimensions)
                 query += " slimit 1"
 
             result = self._query_influxdb(query)
@@ -459,7 +459,7 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
                                                  period, offset, group_by, limit)
 
             if not group_by and not merge_metrics_flag:
-                dimensions = self._get_dimensions(tenant_id, region, name, dimensions, start_time=start_timestamp, end_time=end_timestamp)
+                dimensions = self._get_dimensions(tenant_id, region, name, dimensions)
                 query += " slimit 1"
 
             result = self._query_influxdb(query)
