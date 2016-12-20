@@ -194,17 +194,20 @@ class Alarms(alarms_api_v2.AlarmsV2API,
                     old.add(v)
                 else:
                     template_vars[k] = {old, v}
+        for k, v in template_vars.iteritems():
+            template_vars[k] = ", ".join(v)
+
         # add additional variables (TODO: add the metric value)
         ts = datetime.datetime.strptime(alarm['state_updated_timestamp'], "%Y-%m-%dT%H:%M:%SZ")
         template_vars['_age'] = time.time() - time.mktime(ts.timetuple())
         template_vars['_timestamp'] = alarm['state_updated_timestamp']
         template_vars['_state'] = alarm['state']
-
         desc = alarm[u'alarm_definition'][u'description']
         try:
             alarm[u'alarm_definition'][u'description'] = Template(desc).render(**template_vars)
         except TemplateSyntaxError as ex:
-            LOG.debug('alarm-definition %s does not follow Jinja2 syntax: %s', alarm[u'alarm_definition'][u'id'], ex.message)
+            LOG.debug('alarm-definition %s does not follow Jinja2 syntax: %s', alarm[u'alarm_definition'][u'id'],
+                      ex.message)
             pass
         except Exception:
             LOG.exception("failed rendering alarm-definition: %s", desc)
