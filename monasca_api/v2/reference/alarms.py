@@ -195,7 +195,8 @@ class Alarms(alarms_api_v2.AlarmsV2API,
                 else:
                     template_vars[k] = {old, v}
         for k, v in template_vars.iteritems():
-            template_vars[k] = ", ".join(v)
+            if isinstance(v, set):
+                template_vars[k] = ", ".join(v)
 
         # add additional variables (TODO: add the metric value)
         ts = datetime.datetime.strptime(alarm['state_updated_timestamp'], "%Y-%m-%dT%H:%M:%SZ")
