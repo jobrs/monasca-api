@@ -381,9 +381,9 @@ class AlarmDefinitions(alarm_definitions_api_v2.AlarmDefinitionsV2API,
 
         if expression:
             try:
-                sub_expr_list = (
-                    monasca_api.expression_parser.alarm_expr_parser.
-                    AlarmExprParser(expression).sub_expr_list)
+                parsed_adef = monasca_api.expression_parser.alarm_expr_parser.AlarmExprParser(expression)
+                sub_expr_list = parsed_adef.sub_expr_list
+                fmtd_expression = parsed_adef.fmtd_expr_str
 
             except pyparsing.ParseException as ex:
                 LOG.exception(ex)
@@ -393,6 +393,7 @@ class AlarmDefinitions(alarm_definitions_api_v2.AlarmDefinitionsV2API,
                 raise HTTPUnprocessableEntityError(title, msg)
         else:
             sub_expr_list = None
+            fmtd_expression = None
 
         if name:
             self._validate_name_not_conflicting(tenant_id, name, expected_id=definition_id)
@@ -402,7 +403,7 @@ class AlarmDefinitions(alarm_definitions_api_v2.AlarmDefinitionsV2API,
                 tenant_id,
                 definition_id,
                 name,
-                expression,
+                fmtd_expression,
                 sub_expr_list,
                 actions_enabled,
                 description,
@@ -434,7 +435,7 @@ class AlarmDefinitions(alarm_definitions_api_v2.AlarmDefinitionsV2API,
              u'alarmDefinitionId': definition_id,
              u'alarmName': name,
              u'alarmDescription': description,
-             u'alarmExpression': expression,
+             u'alarmExpression': fmtd_expression,
              u'severity': severity,
              u'matchBy': match_by,
              u'alarmActionsEnabled': actions_enabled,
@@ -486,10 +487,8 @@ class AlarmDefinitions(alarm_definitions_api_v2.AlarmDefinitionsV2API,
                                  alarm_actions, undetermined_actions,
                                  ok_actions):
         try:
-
-            sub_expr_list = (
-                monasca_api.expression_parser.alarm_expr_parser.
-                AlarmExprParser(expression).sub_expr_list)
+            parsed_adef = monasca_api.expression_parser.alarm_expr_parser.AlarmExprParser(expression)
+            sub_expr_list = parsed_adef.sub_expr_list
 
         except pyparsing.ParseException as ex:
             LOG.exception(ex)
@@ -499,12 +498,13 @@ class AlarmDefinitions(alarm_definitions_api_v2.AlarmDefinitionsV2API,
             raise HTTPUnprocessableEntityError(title, msg)
 
         self._validate_name_not_conflicting(tenant_id, name)
+        fmtd_expression = parsed_adef.fmtd_expr_str
 
         alarm_definition_id = (
             self._alarm_definitions_repo.
             create_alarm_definition(tenant_id,
                                     name,
-                                    expression,
+                                    fmtd_expression,
                                     sub_expr_list,
                                     description,
                                     severity,
@@ -515,7 +515,7 @@ class AlarmDefinitions(alarm_definitions_api_v2.AlarmDefinitionsV2API,
 
         self._send_alarm_definition_created_event(tenant_id,
                                                   alarm_definition_id,
-                                                  name, expression,
+                                                  name, fmtd_expression,
                                                   sub_expr_list,
                                                   description, match_by)
         result = (
@@ -523,8 +523,8 @@ class AlarmDefinitions(alarm_definitions_api_v2.AlarmDefinitionsV2API,
              u'description': description, u'match_by': match_by,
              u'severity': severity, u'actions_enabled': u'true',
              u'undetermined_actions': undetermined_actions,
-             u'expression': expression, u'id': alarm_definition_id,
-             u'deterministic': is_definition_deterministic(expression),
+             u'expression': fmtd_expression, u'id': alarm_definition_id,
+             u'deterministic': is_definition_deterministic(fmtd_expression),
              u'name': name})
 
         return result

@@ -66,6 +66,10 @@ class SubExpr(object):
         return result
 
     @property
+    def fmtd_expr_str(self):
+        return self.fmtd_sub_expr_str
+
+    @property
     def dimensions_str(self):
         """Get all the dimensions as a single comma delimited string."""
         return u",".join(self._dimensions)
@@ -171,6 +175,10 @@ class BinaryOp(object):
         return ([sub_operand for operand in self.operands for sub_operand in
                  operand.operands_list])
 
+    @property
+    def fmtd_expr_str(self):
+        return self.operands[0].fmtd_expr_str + " " + self.op + " " + self.operands[1].fmtd_expr_str
+
 
 class AndSubExpr(BinaryOp):
     """Expand later as needed."""
@@ -275,15 +283,18 @@ expression = (
 class AlarmExprParser(object):
     def __init__(self, expr):
         self._expr = expr
+        self._result = (expression + pyparsing.stringEnd).parseString(self._expr)
 
     @property
     def sub_expr_list(self):
         # Remove all spaces before parsing. Simple, quick fix for whitespace
         # issue with dimension list not allowing whitespace after comma.
-        parse_result = (expression + pyparsing.stringEnd).parseString(
-            self._expr)
-        sub_expr_list = parse_result[0].operands_list
+        sub_expr_list = self._result[0].operands_list
         return sub_expr_list
+
+    @property
+    def fmtd_expr_str(self):
+        return self._result[0].fmtd_expr_str
 
 
 def main():
