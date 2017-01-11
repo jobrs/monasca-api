@@ -89,6 +89,8 @@ def sql_try_catch_block(fun):
             # see https://github.com/PyMySQL/PyMySQL/issues/526
             if 'Package sequence number wrong' in ex.message:
                 return try_it(*args, **kwargs)
+            else:
+                raise
         except Exception as ex:
             LOG.exception(ex)
             _statsd_configdb_error_count.increment(1, sample_rate=1)
