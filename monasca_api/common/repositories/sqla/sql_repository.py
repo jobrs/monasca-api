@@ -12,7 +12,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-
+import pymysql
 from oslo_config import cfg
 from oslo_log import log
 
@@ -83,6 +83,12 @@ def sql_try_catch_block(fun):
             raise
         except exceptions.AlreadyExistsException:
             raise
+        except pymysql.err.InternalError as ex:
+            _statsd_configdb_error_count.increment(1, sample_rate=1)
+            # workaround for pymysql 0.7.9 not properly interpreting goodbye packats from MariaDB
+            # see https://github.com/PyMySQL/PyMySQL/issues/526
+            if 'Package sequence number wrong' in ex.message:
+                return try_it(*args, **kwargs)
         except Exception as ex:
             LOG.exception(ex)
             _statsd_configdb_error_count.increment(1, sample_rate=1)
