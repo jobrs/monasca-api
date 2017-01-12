@@ -29,7 +29,7 @@ ALARMS_LIST_TIME = "api.alarms_list_time"
 
 INFLUXDB_QUERY_TIME = "influxdb.query_time"
 """time needed to query data from InfluxDB """
-TSDB_ERRORS = "api.tsdb_errors"
+TSDB_ERRORS = "tsdb.access_errors"
 """ errors when accessing the TSDB (e.g. InfluxDB) """
 CONFIGDB_ERRORS = "configdb.access_errors"
 """ errors when accessing the configuration DB (e.g. MySQL) """
