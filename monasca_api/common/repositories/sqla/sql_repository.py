@@ -88,7 +88,7 @@ def sql_try_catch_block(fun):
             _statsd_configdb_error_count.increment(1, sample_rate=1)
             # workaround for pymysql 0.7.9 not properly interpreting goodbye packets from MariaDB
             # see https://github.com/PyMySQL/PyMySQL/issues/526
-            if 'Packet sequence number wrong' in ex.message:
+            if 'Package sequence number wrong' in ex.message:
                 LOG.error("Retrying (suspecting known pymysql 0.7.x package sequencing issue after MariaDB restart)...")
                 return try_it(*args, **kwargs)
             else:
