@@ -292,6 +292,7 @@ class AlarmDefinitions(alarm_definitions_api_v2.AlarmDefinitionsV2API,
 
         sub_alarm_definition_rows = (
             self._alarm_definitions_repo.get_sub_alarm_definitions(id))
+        a
         alarm_metric_rows = self._alarm_definitions_repo.get_alarm_metrics(
             tenant_id, id)
         sub_alarm_rows = self._alarm_definitions_repo.get_sub_alarms(
