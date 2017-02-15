@@ -30,7 +30,7 @@ schemes = ['http', 'https']
 
 notification_schema = {
     Required('name'): Schema(All(Any(str, unicode), Length(max=250))),
-    Required('type'): Schema(Any(str)),
+    Required('type'): Schema(Any(str, unicode)),
     Required('address'): Schema(All(Any(str, unicode), Length(max=512))),
     Marker('period'): All(Any(int, str))}
 
@@ -41,7 +41,7 @@ def parse_and_validate(msg, valid_periods, require_all=False):
     try:
         request_body_schema(msg)
     except Exception as ex:
-        LOG.debug(ex)
+        LOG.exception(ex)
         raise exceptions.ValidationException(str(ex))
 
     if 'period' not in msg:

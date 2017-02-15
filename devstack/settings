@@ -1,5 +1,6 @@
 #
-# (C) Copyright 2015 Hewlett Packard Enterprise Development Company LP
+# (C) Copyright 2015 Hewlett Packard Enterprise Development LP
+# Copyright 2017 FUJITSU LIMITED
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -77,15 +78,25 @@ enable_service monasca-agent
 # monasca-cli depends on monasca-api
 enable_service monasca-cli
 
-# monasca-smoke-test enabled for ci
-enable_service monasca-smoke-test
-
 #
 # Dependent Software Versions
 #
 
-INFLUXDB_VERSION=${INFLUXDB_VERSION:-0.9.5}
-VERTICA_VERSION=${VERTICA_VERSION:-7.2.1-0}
+# Set the InfluxDB version to use for the Java and Python API
+# InfluxDB has modified the result sets for SHOW SERIES. The
+# Python API has been modified to support those changes, but the
+# Java API hasn't yet. These two environment variables allow you
+# to deploy either the Java or Python API without having to
+# also set the INFLUXDB_VERSION when switching between the two.
+INFLUXDB_JAVA_VERSION=${INFLUXDB_JAVA_VERSION:-0.9.5}
+INFLUXDB_PYTHON_VERSION=${INFLUXDB_PYTHON_VERSION:-1.1.0}
+
+# To set the same version of InfluxDB for both languages use the
+# following variable. This will override both the Java and Python
+# specific variables above.
+# INFLUXDB_VERSION=${INFLUXDB_VERSION:-0.9.5}
+
+VERTICA_VERSION=${VERTICA_VERSION:-8.0.0-0}
 CASSANDRA_VERSION=${CASSANDRA_VERSION:-37x}
 # Kafka deb consists of the version of scala plus the version of kafka
 BASE_KAFKA_VERSION=${BASE_KAFKA_VERSION:-0.8.1.1}
@@ -98,6 +109,7 @@ NVM_VERSION=${NVM_VERSION:-"0.32.1"}
 
 # Path settings
 MONASCA_BASE=${DEST}
+MONASCA_SCHEMA_DIR=${DEST}/monasca/schema
 
 # Repository settings
 MONASCA_API_REPO=${MONASCA_API_REPO:-${GIT_BASE}/openstack/monasca-api.git}
@@ -132,6 +144,10 @@ MONASCA_COMMON_REPO=${MONASCA_COMMON_REPO:-${GIT_BASE}/openstack/monasca-common.
 MONASCA_COMMON_BRANCH=${MONASCA_COMMON_BRANCH:-master}
 MONASCA_COMMON_DIR=${MONASCA_BASE}/monasca-common
 
+MONASCA_STATSD_REPO=${MONASCA_STATSD_REPO:-${GIT_BASE}/openstack/monasca-statsd.git}
+MONASCA_STATSD_BRANCH=${MONASCA_STATSD_BRANCH:-master}
+MONASCA_STATSD_DIR=${MONASCA_BASE}/monasca-statsd
+
 MONASCA_GRAFANA_DATASOURCE_REPO=${MONASCA_GRAFANA_DATASOURCE_REPO:-${GIT_BASE}/openstack/monasca-grafana-datasource.git}
 MONASCA_GRAFANA_DATASOURCE_BRANCH=${MONASCA_GRAFANA_DATASOURCE_BRANCH:-master}
 MONASCA_GRAFANA_DATASOURCE_DIR=${MONASCA_BASE}/monasca-grafana-datasource
@@ -139,3 +155,16 @@ MONASCA_GRAFANA_DATASOURCE_DIR=${MONASCA_BASE}/monasca-grafana-datasource
 GRAFANA_REPO=${GRAFANA_REPO:-"https://github.com/twc-openstack/grafana.git"}
 GRAFANA_BRANCH=${GRAFANA_BRANCH:-"master-keystone"}
 GRAFANA_DIR=${MONASCA_BASE}/grafana
+
+# Database settings
+MONASCA_DATABASE_USE_ORM=false
+
+MONASCA_API_DATABASE_USER="monapi"
+MONASCA_THRESH_DATABASE_USER="thresh"
+MONASCA_NOTIFICATION_DATABASE_USER="notification"
+
+# Other settings
+DOWNLOAD_FILE_TIMEOUT=${DOWNLOAD_FILE_TIMEOUT:-30}
+
+# Public configuration
+MONASCA_STATSD_PORT=${MONASCA_STATSD_PORT:-8125}
