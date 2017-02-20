@@ -51,7 +51,7 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
             raise exceptions.RepositoryException(ex)
 
         self._statsd_tsdb_error_count = STATSD_CLIENT.get_counter(TSDB_ERRORS)
-    
+
     def _init_serie_builders(self):
         '''Initializes functions for serie builders that are specific to different versions
         of InfluxDB.
