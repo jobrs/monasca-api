@@ -38,6 +38,7 @@ STATSD_TIMER = STATSD_CLIENT.get_timer()
 
 class MetricsRepository(metrics_repository.AbstractMetricsRepository):
     def __init__(self):
+        self._statsd_tsdb_error_count = STATSD_CLIENT.get_counter(TSDB_ERRORS)
 
         try:
             self.conf = cfg.CONF
@@ -49,8 +50,6 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
         except Exception as ex:
             LOG.exception(ex)
             raise exceptions.RepositoryException(ex)
-
-        self._statsd_tsdb_error_count = STATSD_CLIENT.get_counter(TSDB_ERRORS)
 
     def _init_serie_builders(self):
         '''Initializes functions for serie builders that are specific to different versions
@@ -910,8 +909,7 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
     def _query_influxdb(self, query):
         try:
             result = self.influxdb_client.query(query)
-            self._statsd_tsdb_error_count.increment(0, sample_rate=0.01)
             return result
         except Exception as ex:
-            self._statsd_tsdb_error_count.increment(1, sample_rate=1.0)
+            self._statsd_tsdb_error_count.increment(1)
             raise ex
