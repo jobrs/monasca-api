@@ -132,7 +132,7 @@ class AlarmDefinitionsRepository(sql_repository.SQLRepository,
                                                            == am_s.c.metric_definition_dimensions_id)
                                                      .join(mde_s, mde_s.c.id == mdd_s.c.metric_definition_id)
                                                      .outerjoin(mdg, mdg.c.dimension_set_id
-                                                           == mdd_s.c.metric_dimension_set_id))
+                                                                == mdd_s.c.metric_dimension_set_id))
                                         .where(ad_s.c.tenant_id == bindparam('b_tenant_id'))
                                         .where(ad_s.c.id == bindparam('b_id'))
                                         .order_by(a_s.c.id)

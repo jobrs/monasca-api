@@ -188,7 +188,20 @@ class Alarms(alarms_api_v2.AlarmsV2API,
             if isinstance(v, set):
                 template_vars[k] = ", ".join(v)
 
-        # add additional variables (TODO: add the metric value)
+        # provide actual metric values leading to the alarm
+        # TODO: query needs to be changed to provide this data
+        for subalarm in alarm.get('subAlarms', []):
+            metric_name = subalarm['subAlarmExpression']['metricDefinition']['name'].replace('.', '_')
+            metric_value = subalarm['currentValues']
+            if len(metric_value) == 0:
+                template_vars[metric_name] = None
+            elif len(metric_value) == 1:
+                template_vars[metric_name] = metric_value[0]
+            else:
+                template_vars[metric_name] = metric_value
+
+        # add additional variables
+        # TODO: add sub-alarm states
         ts = datetime.datetime.strptime(alarm['state_updated_timestamp'], "%Y-%m-%dT%H:%M:%SZ")
         template_vars['_age'] = time.time() - time.mktime(ts.timetuple())
         template_vars['_timestamp'] = alarm['state_updated_timestamp']
