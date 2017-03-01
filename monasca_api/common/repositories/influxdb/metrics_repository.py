@@ -17,6 +17,7 @@ from datetime import timedelta
 from distutils import version
 import json
 import monasca_api.monitoring.client as monitoring_client
+import requests
 
 from influxdb import client
 from influxdb.exceptions import InfluxDBClientError
@@ -85,34 +86,10 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
         self._build_serie_metric_list = self._build_serie_metric_list_from_v0_11_0
 
     def _get_influxdb_version(self):
-        '''If Version found in the result set, return the InfluxDB Version,
-        otherwise raise an exception. InfluxDB has changed the format of their
-        result set and SHOW DIAGNOSTICS was introduced at some point so earlier releases
-        of InfluxDB might not return a Version.
+        '''Determine version from the response to /ping
         '''
-        try:
-            result = self._query_influxdb('SHOW DIAGNOSTICS')
-        except InfluxDBClientError as ex:
-            LOG.exception(ex)
-            raise
-
-        if 'series' not in result.raw:
-            LOG.exception('series not in result.raw')
-            raise Exception('Series not in SHOW DIAGNOSTICS result set')
-
-        for series in result.raw['series']:
-            if 'columns' not in series:
-                continue
-            columns = series['columns']
-            if u'Version' not in series['columns']:
-                continue
-            if u'values' not in series:
-                continue
-            for value in series[u'values']:
-                version_index = columns.index(u'Version')
-                version_str = value[version_index]
-                return version.StrictVersion(version_str)
-        raise Exception('Version not found in SHOW DIAGNOSTICS result set')
+        resp = requests.get("http://"+self.conf.influxdb.ip_address+":"+str(self.conf.influxdb.port)+"/ping")
+        return resp.headers.get('x-influxdb-version', '0.9.5')
 
     def _build_show_series_query(self, dimensions, name, tenant_id, region,
                                  start_timestamp=None, end_timestamp=None):
