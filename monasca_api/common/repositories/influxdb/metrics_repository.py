@@ -58,6 +58,7 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
         '''
         try:
             influxdb_version = self._get_influxdb_version()
+            LOG.info('Found InfluxDB version %s', influxdb_version)
             if influxdb_version < version.StrictVersion('0.11.0'):
                 self._init_serie_builders_to_v0_11_0()
             else:
@@ -89,7 +90,7 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
         '''Determine version from the response to /ping
         '''
         resp = requests.get("http://"+self.conf.influxdb.ip_address+":"+str(self.conf.influxdb.port)+"/ping")
-        return resp.headers.get('x-influxdb-version', '0.9.5')
+        return resp.headers.get('x-influxdb-version', '0.0.0')
 
     def _build_show_series_query(self, dimensions, name, tenant_id, region,
                                  start_timestamp=None, end_timestamp=None):
