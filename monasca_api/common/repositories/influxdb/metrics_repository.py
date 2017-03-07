@@ -812,9 +812,11 @@ class MetricsRepository(metrics_repository.AbstractMetricsRepository):
 
             offset_clause = self._build_offset_clause(offset)
 
+            order_by_clause = " order by time desc"
+
             limit_clause = self._build_limit_clause(limit)
 
-            query += where_clause + time_clause + offset_clause + limit_clause
+            query += where_clause + time_clause + offset_clause + order_by_clause + limit_clause
 
             result = self._query_influxdb(query)
 
