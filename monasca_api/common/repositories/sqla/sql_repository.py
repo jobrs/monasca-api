@@ -67,7 +67,6 @@ def sql_try_catch_block(fun):
         try:
 
             result = fun(*args, **kwargs)
-            _statsd_configdb_error_count.increment(0, sample_rate=1)
             return result
 
         except exceptions.DoesNotExistException:
@@ -78,7 +77,7 @@ def sql_try_catch_block(fun):
             raise
         except Exception as ex:
             LOG.exception(ex)
-            _statsd_configdb_error_count.increment(1, sample_rate=1)
+            _statsd_configdb_error_count.increment(1)
             raise
 
         # exceptions.RepositoryException(ex)
