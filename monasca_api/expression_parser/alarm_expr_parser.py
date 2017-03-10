@@ -212,9 +212,10 @@ def periodValidation(instr, loc, tokens):
                                             "Period must not be 0")
 
     if (period % 60) != 0:
-        raise pyparsing.ParseFatalException(instr, loc,
-                                            "Period {} must be a multiple of 60"
-                                            .format(period))
+        return ((period + 59) / 60) * 60
+        # raise pyparsing.ParseFatalException(instr, loc,
+        #                                    "Period {} must be a multiple of 60"
+        #                                    .format(period))
     # Must return the string
     return tokens[0]
 
