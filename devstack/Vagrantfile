@@ -41,7 +41,7 @@ Vagrant.configure(2) do |config|
   config.vm.provision "shell", privileged: false, inline: <<-SHELL
     # sudo apt-get update
     # sudo apt-get -y upgrade
-    sudo apt-get -y install git jq
+    sudo apt-get -y install git
 
     if [ $http_proxy ]; then
       git config --global url.https://git.openstack.org/.insteadOf git://git.openstack.org/
@@ -121,7 +121,8 @@ LOG_COLOR=False
 DEST=/opt/stack
 
 disable_all_services
-enable_service zookeeper rabbit key tempest horizon
+enable_service zookeeper rabbit key horizon
+#enable_service zookeeper rabbit key tempest horizon
 
 # Uncomment one of the following lines to use either MySQL or PostgreSQL
 # as RDB (relational database) backend for monasca.
