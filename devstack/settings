@@ -112,7 +112,7 @@ MONASCA_BASE=${DEST}
 MONASCA_SCHEMA_DIR=${DEST}/monasca/schema
 
 # Repository settings
-GIT_BASE=https://github.com/sapcc
+GIT_BASE=https://github.com
 GIT_USER=sapcc
 
 MONASCA_API_REPO=${MONASCA_API_REPO:-${GIT_BASE}/${GIT_USER}/monasca-api.git}
