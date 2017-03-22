@@ -112,6 +112,7 @@ MONASCA_BASE=${DEST}
 MONASCA_SCHEMA_DIR=${DEST}/monasca/schema
 
 # Repository settings
+MONASCA_UI_REPO=${GIT_BASE}/openstack/monasca-ui.git
 GIT_BASE=https://github.com
 GIT_USER=sapcc
 
