@@ -59,9 +59,6 @@ def parse_and_validate(msg, valid_periods, require_all=False):
     elif notification_type == 'WEBHOOK':
         _validate_url(msg['address'])
 
-    if notification_type != 'WEBHOOK' and msg['period'] != 0:
-        raise exceptions.ValidationException("Period can only be set with webhooks")
-
 
 def _validate_email(address):
     if not validation.validate_email_address(address):
