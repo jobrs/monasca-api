@@ -78,12 +78,9 @@ fi
 function pre_install_monasca {
     echo_summary "Pre-Installing Monasca Components"
     install_git
-    install_jq
     install_maven
     install_openjdk_8_jdk
-
-    apache_mirror=`curl -s 'https://www.apache.org/dyn/closer.cgi?as_json=1' | jq --raw-output '.preferred'`
-
+    find_nearest_apache_mirror
     install_kafka
 
     if is_service_enabled monasca-storm; then
@@ -91,6 +88,11 @@ function pre_install_monasca {
     fi
 
     install_monasca_$MONASCA_METRICS_DB
+}
+
+function find_nearest_apache_mirror {
+    install_jq
+    apache_mirror=`curl -s 'https://www.apache.org/dyn/closer.cgi?as_json=1' | jq --raw-output '.preferred'`
 }
 
 function install_monasca {
