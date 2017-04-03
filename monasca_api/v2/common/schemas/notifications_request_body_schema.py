@@ -86,6 +86,4 @@ def _parse_and_validate_period(period, valid_periods):
         period = int(period)
     except Exception:
         raise exceptions.ValidationException("Period {} must be a valid integer".format(period))
-    if period != 0 and period not in valid_periods:
-        raise exceptions.ValidationException("{} is not a valid period".format(period))
     return period
